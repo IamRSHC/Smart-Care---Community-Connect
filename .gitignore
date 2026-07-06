@@ -1,0 +1,10 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Local SQLite DB - never commit this, and it shouldn't exist on Render anyway
+backend/smartcare.db
+
+# Env files
+.env

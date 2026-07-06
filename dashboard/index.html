@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartCare — Caregiver Dashboard</title>
+<style>
+  :root {
+    --ink: #1c2b2d;
+    --paper: #f3f0e8;
+    --panel: #ffffff;
+    --line: #d8d2c2;
+    --teal: #2f6f66;
+    --teal-deep: #1d4b45;
+    --amber: #c98a2b;
+    --amber-bg: #fbf0dd;
+    --red: #b0412f;
+    --red-bg: #fbe6e1;
+    --green: #3f7d55;
+    --green-bg: #e9f3ea;
+    --muted: #6d6a5e;
+    font-family: "Iowan Old Style", "Georgia", serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI", -apple-system, sans-serif;
+  }
+  header {
+    padding: 28px 36px 20px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .brand svg { flex-shrink: 0; }
+  .brand h1 {
+    font-family: "Iowan Old Style", "Georgia", serif;
+    font-weight: 600;
+    font-size: 26px;
+    margin: 0;
+    letter-spacing: 0.2px;
+    color: var(--teal-deep);
+  }
+  .brand span {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .conn-status {
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted);
+  }
+  .dot.live { background: var(--green); }
+
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 36px 60px;
+  }
+
+  .section-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1.6px;
+    color: var(--muted);
+    margin: 30px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  #alertFeed {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .alert-card {
+    background: var(--panel);
+    border-left: 4px solid var(--muted);
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .alert-card.red { border-left-color: var(--red); background: var(--red-bg); }
+  .alert-card.amber { border-left-color: var(--amber); background: var(--amber-bg); }
+  .alert-card .msg { font-size: 14.5px; }
+  .alert-card .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .ack-btn {
+    border: 1px solid var(--teal);
+    background: transparent;
+    color: var(--teal-deep);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .ack-btn:hover { background: var(--teal); color: white; }
+  .empty-note {
+    color: var(--muted);
+    font-size: 14px;
+    font-style: italic;
+    padding: 10px 2px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .resident-card {
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 18px 20px;
+    border-top: 5px solid var(--muted);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .resident-card.green { border-top-color: var(--green); }
+  .resident-card.amber { border-top-color: var(--amber); }
+  .resident-card.red { border-top-color: var(--red); }
+
+  .resident-card .name-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .resident-card h3 { margin: 0; font-size: 18px; }
+  .room { font-size: 12.5px; color: var(--muted); }
+
+  .pulse {
+    display: block;
+    width: 100%;
+    height: 26px;
+    margin: 10px 0 8px;
+  }
+  .vitals-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13.5px;
+    color: var(--ink);
+    margin-top: 6px;
+  }
+  .vitals-row div { text-align: center; flex: 1; }
+  .vitals-row .label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .vitals-row .val { font-size: 16px; font-weight: 600; margin-top: 2px; }
+  .updated-at { font-size: 11px; color: var(--muted); margin-top: 10px; }
+
+  footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 20px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+      <circle cx="17" cy="17" r="16" stroke="#2f6f66" stroke-width="1.4"/>
+      <path d="M6 17h4l2-6 3 12 3-9 2 3h6" stroke="#2f6f66" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <h1>SmartCare</h1>
+      <span>Sree Sai Saran Trust · Resident Monitoring</span>
+    </div>
+  </div>
+  <div class="conn-status"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></div>
+</header>
+
+<main>
+  <div class="section-title">Active alerts</div>
+  <div id="alertFeed"><div class="empty-note">No alerts yet.</div></div>
+
+  <div class="section-title">Residents</div>
+  <div class="grid" id="residentGrid"></div>
+</main>
+
+<footer>Prototype dashboard · Community Connect 21GNP301L · Data shown is not medical-grade diagnostic information</footer>
+
+<script>
+// ---- Backend connection config ----
+// Local dev: leave as-is, talks to your uvicorn server on localhost.
+// After deploying to Render: change BACKEND_HOST to your Render URL's
+// host only (no https://, no trailing slash), e.g.:
+//   const BACKEND_HOST = "smartcare-backend.onrender.com";
+// http/https and ws/wss are picked automatically based on whether this
+// is localhost or a real deployed host - Vercel serves this page over
+// HTTPS, and a plain ws:// call from an HTTPS page gets blocked by the
+// browser as mixed content, so this switch matters, not just cosmetics.
+const BACKEND_HOST = "localhost:8000";
+
+const isLocal = BACKEND_HOST.startsWith("localhost") || BACKEND_HOST.startsWith("127.0.0.1");
+const API_BASE = `${isLocal ? "http" : "https"}://${BACKEND_HOST}`;
+const WS_URL = `${isLocal ? "ws" : "wss"}://${BACKEND_HOST}/ws/alerts`;
+
+function pulseSvg(color) {
+  return `<svg class="pulse" viewBox="0 0 200 26" preserveAspectRatio="none">
+    <polyline points="0,13 30,13 38,4 46,22 54,13 70,13 78,6 86,20 94,13 200,13"
+      fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+async function fetchResidents() {
+  try {
+    const res = await fetch(`${API_BASE}/api/residents`);
+    const residents = await res.json();
+    renderResidents(residents);
+  } catch (e) {
+    console.error("Failed to load residents", e);
+  }
+}
+
+function statusColor(status) {
+  if (status === "red") return "#b0412f";
+  if (status === "amber") return "#c98a2b";
+  return "#3f7d55";
+}
+
+function renderResidents(residents) {
+  const grid = document.getElementById("residentGrid");
+  if (!residents.length) {
+    grid.innerHTML = '<div class="empty-note">No residents registered yet. POST to /api/residents to add one.</div>';
+    return;
+  }
+  grid.innerHTML = residents.map(r => {
+    const lr = r.latest_reading || {};
+    const color = statusColor(r.status);
+    return `
+      <div class="resident-card ${r.status}">
+        <div class="name-row">
+          <h3>${r.name}</h3>
+          <span class="room">${r.room_no || ''}</span>
+        </div>
+        ${pulseSvg(color)}
+        <div class="vitals-row">
+          <div><div class="label">HR</div><div class="val">${lr.heart_rate ?? '--'}</div></div>
+          <div><div class="label">SpO2</div><div class="val">${lr.spo2 ?? '--'}%</div></div>
+          <div><div class="label">Temp</div><div class="val">${lr.temperature ?? '--'}°C</div></div>
+        </div>
+        <div class="updated-at">Last reading: ${lr.timestamp ? new Date(lr.timestamp).toLocaleTimeString() : 'no data'} ${r.open_alerts ? `· ${r.open_alerts} open alert(s)` : ''}</div>
+      </div>`;
+  }).join("");
+}
+
+function addAlertToFeed(alert) {
+  const feed = document.getElementById("alertFeed");
+  const emptyNote = feed.querySelector(".empty-note");
+  if (emptyNote) emptyNote.remove();
+
+  const card = document.createElement("div");
+  card.className = `alert-card ${alert.severity}`;
+  card.dataset.alertId = alert.id;
+  card.innerHTML = `
+    <div>
+      <div class="msg">${alert.message}</div>
+      <div class="meta">${alert.alert_type} · ${new Date(alert.timestamp).toLocaleTimeString()}</div>
+    </div>
+    <button class="ack-btn" onclick="acknowledge(${alert.id}, this)">Acknowledge</button>
+  `;
+  feed.prepend(card);
+}
+
+async function acknowledge(alertId, btn) {
+  const staffName = prompt("Your name (for the log):", "Staff");
+  if (!staffName) return;
+  try {
+    await fetch(`${API_BASE}/api/alerts/${alertId}/acknowledge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ staff_name: staffName }),
+    });
+    btn.closest(".alert-card").remove();
+    fetchResidents();
+  } catch (e) {
+    console.error("Failed to acknowledge alert", e);
+  }
+}
+
+function connectWebSocket() {
+  const ws = new WebSocket(WS_URL);
+  const dot = document.getElementById("connDot");
+  const text = document.getElementById("connText");
+
+  ws.onopen = () => { dot.classList.add("live"); text.textContent = "live"; };
+  ws.onclose = () => {
+    dot.classList.remove("live"); text.textContent = "reconnecting…";
+    setTimeout(connectWebSocket, 3000);
+  };
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === "alert") {
+      addAlertToFeed(data);
+      fetchResidents();
+    }
+  };
+  setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send("ping"); }, 15000);
+}
+
+fetchResidents();
+setInterval(fetchResidents, 10000);
+connectWebSocket();
+</script>
+
+</body>
+</html>
