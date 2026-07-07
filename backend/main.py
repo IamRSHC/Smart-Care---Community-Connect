@@ -206,6 +206,20 @@ async def ingest_reading(payload: SensorPayload, db: Session = Depends(get_db)):
 
     new_alerts = evaluate_reading(resident, reading, previous_reading, last_movement_time)
 
+    # Dedup: if this resident already has an open (unacknowledged) alert of
+    # the same type, don't open a second one. Without this, a sustained
+    # anomaly (e.g. a fall scenario sending several readings in a row, or a
+    # resident staying below the SpO2 threshold for a few minutes) floods
+    # the alert feed with dozens of near-identical entries instead of one
+    # alert that stays open until staff acknowledge it.
+    open_alert_types = {
+        a.alert_type
+        for a in db.query(models.Alert)
+        .filter(models.Alert.resident_id == resident.id, models.Alert.acknowledged == False)  # noqa: E712
+        .all()
+    }
+    new_alerts = [a for a in new_alerts if a.alert_type not in open_alert_types]
+
     for alert in new_alerts:
         db.add(alert)
     db.commit()

@@ -6,16 +6,18 @@ it to the backend /api/ingest endpoint, so the dashboard and alerting can be
 demoed and tested before/without the ESP32 hardware being ready.
 
 Usage:
+    # against your local backend (default)
     python simulate_sensors.py --resident-id 1 --scenario normal
-    python simulate_sensors.py --resident-id 1 --scenario fall
-    python simulate_sensors.py --resident-id 1 --scenario low_spo2
+
+    # against your deployed Render backend
+    python simulate_sensors.py --resident-id 1 --scenario fall --api-base https://smartcare-backend-pcc5.onrender.com
 """
 import argparse
 import random
 import time
 import requests
 
-API_URL = "http://localhost:8000/api/ingest"
+DEFAULT_API_BASE = "http://localhost:8000"
 
 
 def normal_reading():
@@ -72,15 +74,23 @@ def main():
     parser.add_argument("--scenario", choices=SCENARIOS.keys(), default="normal")
     parser.add_argument("--interval", type=float, default=3.0, help="seconds between readings")
     parser.add_argument("--count", type=int, default=20, help="number of readings to send")
+    parser.add_argument(
+        "--api-base",
+        default=DEFAULT_API_BASE,
+        help=f"backend base URL, no trailing slash (default: {DEFAULT_API_BASE}). "
+             "Use your Render URL to send data to the deployed backend instead of local.",
+    )
     args = parser.parse_args()
 
+    api_url = f"{args.api_base.rstrip('/')}/api/ingest"
     generator = SCENARIOS[args.scenario]
 
+    print(f"Sending to: {api_url}")
     for i in range(args.count):
         reading = generator()
         reading["resident_id"] = args.resident_id
         try:
-            resp = requests.post(API_URL, json=reading, timeout=5)
+            resp = requests.post(api_url, json=reading, timeout=10)
             print(f"[{i+1}/{args.count}] sent {args.scenario} reading -> {resp.status_code} {resp.json()}")
         except requests.RequestException as e:
             print(f"Error posting reading: {e}")
