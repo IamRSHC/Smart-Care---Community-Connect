@@ -275,7 +275,7 @@
   .kpi-card.ok .kpi-value { color: var(--green); }
 
   /* ---------- Needs attention: expanded incident cards ---------- */
-  #attentionFeed { display: flex; flex-direction: column; gap: 12px; }
+  #attentionFeed { display: flex; flex-direction: column; gap: 12px; max-height: 62vh; overflow-y: auto; padding-right: 4px; }
   .incident-card {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -301,6 +301,25 @@
   }
   .incident-alert-row .msg { font-size: 13.5px; font-weight: 500; }
   .incident-alert-row .meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); margin-top: 2px; }
+  .incident-alert-row .count-badge {
+    font-family: var(--font-mono); font-size: 10.5px;
+    background: var(--panel-raised); border: 1px solid var(--line);
+    padding: 2px 8px; border-radius: 999px; color: var(--text-muted);
+    margin-left: 8px;
+  }
+  .ack-all-btn {
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--text-muted);
+    padding: 6px 13px;
+    border-radius: 7px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+  .ack-all-btn:hover { background: var(--red); color: white; border-color: var(--red); }
   .ack-btn {
     border: 1px solid var(--line);
     background: transparent;
@@ -583,22 +602,35 @@ async function renderAttentionFeed(attentionResidents) {
     const color = statusColorHex(r.status);
     const spark = await buildSparkline(r.id, color);
     const residentAlerts = openAlertsCache.filter(a => a.resident_id === r.id);
-    const alertRows = residentAlerts.map(a => `
-      <div class="incident-alert-row">
-        <div>
-          <div class="msg">${a.message}</div>
-          <div class="meta">${a.alert_type} · ${new Date(a.timestamp).toLocaleTimeString()}</div>
-        </div>
-        <button class="ack-btn" onclick="acknowledge(${a.id})">Acknowledge</button>
-      </div>`).join("");
+
+    // Group same-type alerts for this resident into one summary row instead
+    // of rendering every duplicate as its own box - a resident with 40 stale
+    // "possible_fall" pings should show one grouped line, not 40 flat rows.
+    const groups = {};
+    residentAlerts.forEach(a => {
+      if (!groups[a.alert_type]) groups[a.alert_type] = [];
+      groups[a.alert_type].push(a);
+    });
+    const groupRows = Object.entries(groups).map(([type, items]) => {
+      const sorted = items.slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const latest = sorted[0];
+      const countBadge = items.length > 1 ? `<span class="count-badge">${items.length}×</span>` : '';
+      return `
+        <div class="incident-alert-row">
+          <div>
+            <div class="msg">${latest.message}${countBadge}</div>
+            <div class="meta">${type} · latest ${new Date(latest.timestamp).toLocaleTimeString()}${items.length > 1 ? ` · first ${new Date(sorted[sorted.length - 1].timestamp).toLocaleTimeString()}` : ''}</div>
+          </div>
+        </div>`;
+    }).join("");
 
     return `
       <div class="incident-card ${r.status}">
         <div class="incident-head">
-          <h3>${r.name}</h3>
-          <span class="room">${r.room_no || '—'}</span>
+          <h3>${r.name} <span class="room">${r.room_no || '—'}</span></h3>
+          <button class="ack-all-btn" onclick="acknowledgeAllForResident(${r.id})">Acknowledge all (${residentAlerts.length})</button>
         </div>
-        <div class="incident-alerts">${alertRows}</div>
+        <div class="incident-alerts">${groupRows}</div>
         ${spark}
         ${vitalsRowHtml(lr)}
         <div class="updated-at">${lr.timestamp ? new Date(lr.timestamp).toLocaleTimeString() : 'no data'}</div>
@@ -630,19 +662,19 @@ function renderStableGrid(stableResidents) {
   }).join("");
 }
 
-async function acknowledge(alertId) {
+async function acknowledgeAllForResident(residentId) {
   const staffName = prompt("Your name (for the log):", "Staff");
   if (!staffName) return;
   try {
-    await fetch(`${API_BASE}/api/alerts/${alertId}/acknowledge`, {
+    await fetch(`${API_BASE}/api/residents/${residentId}/acknowledge-all`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ staff_name: staffName }),
     });
-    openAlertsCache = openAlertsCache.filter(a => a.id !== alertId);
+    openAlertsCache = openAlertsCache.filter(a => a.resident_id !== residentId);
     renderDashboard();
   } catch (e) {
-    console.error("Failed to acknowledge alert", e);
+    console.error("Failed to acknowledge alerts", e);
   }
 }
 

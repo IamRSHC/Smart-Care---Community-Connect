@@ -275,6 +275,22 @@ def acknowledge_alert(alert_id: int, payload: AckPayload, db: Session = Depends(
     return {"status": "acknowledged"}
 
 
+@app.post("/api/residents/{resident_id}/acknowledge-all")
+def acknowledge_all_for_resident(resident_id: int, payload: AckPayload, db: Session = Depends(get_db)):
+    alerts = (
+        db.query(models.Alert)
+        .filter(models.Alert.resident_id == resident_id, models.Alert.acknowledged == False)  # noqa: E712
+        .all()
+    )
+    now = datetime.utcnow()
+    for alert in alerts:
+        alert.acknowledged = True
+        alert.acknowledged_by = payload.staff_name
+        alert.acknowledged_at = now
+    db.commit()
+    return {"status": "ok", "acknowledged_count": len(alerts)}
+
+
 # ---------- AI daily summary (Claude) ----------
 
 @app.get("/api/residents/{resident_id}/daily-summary")
