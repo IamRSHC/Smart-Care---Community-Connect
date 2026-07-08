@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartCare — Resident Monitoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0B1220;
+    --panel: #131B2C;
+    --panel-raised: #182238;
+    --line: #24304A;
+    --text: #E7ECF5;
+    --text-muted: #8792A8;
+    --text-dim: #5C6883;
+    --accent: #4C8DFF;
+    --green: #2FB380;
+    --green-glow: rgba(47, 179, 128, 0.18);
+    --amber: #F5A524;
+    --amber-glow: rgba(245, 165, 36, 0.18);
+    --red: #EF4444;
+    --red-glow: rgba(239, 68, 68, 0.20);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.24);
+    --radius: 12px;
+    --font-display: "Space Grotesk", "Inter", sans-serif;
+    --font-body: "Inter", -apple-system, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  html[data-theme="light"] {
+    --ink: #F1F3F7;
+    --panel: #FFFFFF;
+    --panel-raised: #FFFFFF;
+    --line: #DDE3ED;
+    --text: #131B2C;
+    --text-muted: #5B657A;
+    --text-dim: #93A0B7;
+    --accent: #2563EB;
+    --green: #17915E;
+    --green-glow: rgba(23, 145, 94, 0.10);
+    --amber: #B4780F;
+    --amber-glow: rgba(180, 120, 15, 0.10);
+    --red: #DC2626;
+    --red-glow: rgba(220, 38, 38, 0.10);
+    --shadow: 0 1px 2px rgba(20,30,50,0.06), 0 8px 24px rgba(20,30,50,0.06);
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  html[data-theme="light"] { color-scheme: light; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--font-body);
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  a, button { font-family: inherit; }
+  button:focus-visible, .ack-btn:focus-visible, .icon-btn:focus-visible, select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(11, 18, 32, 0.82);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  html[data-theme="light"] header { background: rgba(241, 243, 247, 0.86); }
+
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-link {
+    display: flex; align-items: center; gap: 12px;
+    text-decoration: none; color: inherit;
+    cursor: pointer;
+  }
+  .brand-mark {
+    width: 40px; height: 40px;
+    border-radius: 11px;
+    background: linear-gradient(155deg, var(--panel-raised) 0%, var(--panel) 60%, var(--ink) 130%);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 8px rgba(0,0,0,0.25);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    transition: border-color 0.2s ease, transform 0.15s ease;
+  }
+  .brand-link:hover .brand-mark { border-color: var(--green); transform: translateY(-1px); }
+  .brand h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 19px;
+    margin: 0;
+    letter-spacing: -0.2px;
+  }
+  .brand .sub {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-dim);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .header-controls { display: flex; align-items: center; gap: 10px; }
+
+  .conn-pill {
+    display: flex; align-items: center; gap: 7px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 7px 12px 7px 10px;
+    border-radius: 999px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+  .dot.live { background: var(--green); box-shadow: 0 0 0 3px var(--green-glow); animation: pulse-dot 2s ease-in-out infinite; }
+  @keyframes pulse-dot {
+    0%, 100% { box-shadow: 0 0 0 3px var(--green-glow); }
+    50% { box-shadow: 0 0 0 6px var(--green-glow); }
+  }
+
+  .icon-btn {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  .demo-toggle {
+    display: flex; align-items: center; gap: 7px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.4px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--text-muted);
+    padding: 8px 13px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .demo-toggle:hover { color: var(--text); border-color: var(--accent); }
+  .demo-toggle .tag {
+    background: var(--accent);
+    color: white;
+    font-size: 9.5px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  #demoDrawer {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 28px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.28s ease;
+  }
+  #demoDrawer.open { max-height: 220px; }
+  .demo-panel {
+    margin-top: 18px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .demo-panel .demo-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .demo-panel .demo-head h4 {
+    margin: 0; font-family: var(--font-display); font-size: 13px; font-weight: 600;
+  }
+  .demo-panel .demo-note {
+    font-size: 12px; color: var(--text-muted); margin: 0 0 14px;
+    line-height: 1.5;
+  }
+  .demo-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .demo-row select {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--ink);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .sim-btn {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.3px;
+    border: 1px solid var(--line);
+    background: var(--ink);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .sim-btn:hover { border-color: var(--accent); }
+  .sim-btn.warn:hover { border-color: var(--red); color: var(--red); }
+  .demo-status {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-dim);
+    margin-top: 10px;
+    min-height: 16px;
+  }
+
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 26px 28px 70px;
+  }
+
+  .section-title {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    color: var(--text-dim);
+    margin: 30px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title .count {
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+  }
+  .section-title::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  /* ---------- KPI strip ---------- */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .kpi-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .kpi-card.danger { border-color: rgba(239,68,68,0.4); background: linear-gradient(180deg, var(--red-glow), transparent 70%), var(--panel); }
+  .kpi-card.ok { border-color: rgba(47,179,128,0.35); background: linear-gradient(180deg, var(--green-glow), transparent 70%), var(--panel); }
+  .kpi-label { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; }
+  .kpi-value { font-family: var(--font-mono); font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .kpi-card.danger .kpi-value { color: var(--red); }
+  .kpi-card.ok .kpi-value { color: var(--green); }
+
+  /* ---------- Needs attention: expanded incident cards ---------- */
+  #attentionFeed { display: flex; flex-direction: column; gap: 12px; }
+  .incident-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--text-dim);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    animation: slide-in 0.25s ease;
+  }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .incident-card.red { border-left-color: var(--red); }
+  .incident-card.amber { border-left-color: var(--amber); }
+  .incident-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .incident-head h3 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 17px; }
+  .incident-alerts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .incident-alert-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    background: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 13px;
+  }
+  .incident-alert-row .msg { font-size: 13.5px; font-weight: 500; }
+  .incident-alert-row .meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); margin-top: 2px; }
+  .ack-btn {
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--text-muted);
+    padding: 7px 15px;
+    border-radius: 7px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+  .ack-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
+  .empty-note {
+    color: var(--text-dim);
+    font-size: 13.5px;
+    padding: 14px 2px;
+  }
+  .empty-calm {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--green);
+    font-size: 13.5px;
+    background: linear-gradient(90deg, var(--green-glow), transparent 50%), var(--panel);
+    border: 1px solid rgba(47,179,128,0.3);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+  }
+
+  .spark { display: block; width: 100%; height: 34px; margin: 10px 0; }
+  .room {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--ink);
+    border: 1px solid var(--line);
+    padding: 2px 7px;
+    border-radius: 5px;
+  }
+  .vitals-row { display: flex; gap: 8px; margin-top: 4px; }
+  .vitals-row .stat { flex: 1; text-align: center; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 4px; }
+  .vitals-row .label { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.6px; }
+  .vitals-row .val { font-family: var(--font-mono); font-size: 17px; font-weight: 600; margin-top: 3px; letter-spacing: -0.3px; }
+  .updated-at { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); margin-top: 10px; }
+
+  /* ---------- Stable strip ---------- */
+  .stable-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .stable-tile {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--green);
+    border-radius: 9px;
+    padding: 11px 13px;
+  }
+  .stable-tile .name-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .stable-tile h4 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 13.5px; }
+  .stable-tile .hr-val { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); }
+  .stable-tile .hr-val b { color: var(--text); font-size: 15px; }
+
+  footer {
+    text-align: right;
+    font-size: 10px;
+    color: var(--text-dim);
+    padding: 8px 16px;
+    opacity: 0.6;
+  }
+
+  @media (max-width: 640px) {
+    header { padding: 14px 16px; }
+    main { padding: 20px 16px 60px; }
+    .brand h1 { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <a class="brand-link" href="index.html" title="Back to start">
+      <div class="brand-mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path id="pulsePath" d="M1 12h3.2l1.6-5.8 3.4 13.2 2.8-13 1.6 5.6H23"
+            stroke="var(--green)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+          <circle r="1.7" fill="var(--green)">
+            <animateMotion dur="2.6s" repeatCount="indefinite"
+              path="M1 12h3.2l1.6-5.8 3.4 13.2 2.8-13 1.6 5.6H23"/>
+          </circle>
+        </svg>
+      </div>
+      <div>
+        <h1>SmartCare</h1>
+        <div class="sub">Sree Sai Saran Trust · Resident Monitoring</div>
+      </div>
+    </a>
+  </div>
+  <div class="header-controls">
+    <button class="demo-toggle" id="demoToggle" type="button" aria-expanded="false">
+      <span class="tag">SIM</span> Demo controls
+    </button>
+    <div class="conn-pill"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></div>
+    <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle theme" title="Toggle light / dark theme">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+    </button>
+  </div>
+</header>
+
+<div id="demoDrawer">
+  <div class="demo-panel">
+    <div class="demo-head">
+      <h4>Simulate sensor data</h4>
+    </div>
+    <p class="demo-note">For demoing without ESP32 hardware connected. Sends a short burst of readings straight to the backend — the same endpoint real sensors post to. Not part of the caregiver workflow.</p>
+    <div class="demo-row">
+      <select id="demoResident"></select>
+      <button class="sim-btn" onclick="runScenario('normal')">Normal</button>
+      <button class="sim-btn warn" onclick="runScenario('fall')">Fall</button>
+      <button class="sim-btn warn" onclick="runScenario('low_spo2')">Low SpO2</button>
+      <button class="sim-btn warn" onclick="runScenario('inactivity')">Inactivity</button>
+    </div>
+    <div class="demo-status" id="demoStatus"></div>
+  </div>
+</div>
+
+<main>
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <div class="section-title">Needs attention <span class="count" id="attentionCount">0</span></div>
+  <div id="attentionFeed"><div class="empty-note">Loading…</div></div>
+
+  <div class="section-title">Stable <span class="count" id="stableCount">0</span></div>
+  <div class="stable-grid" id="stableGrid"></div>
+</main>
+
+<footer>Prototype dashboard · Community Connect 21GNP301L · Data shown is not medical-grade diagnostic information</footer>
+
+<script>
+const BACKEND_HOST = "smartcare-backend-pcc5.onrender.com";
+
+const isLocal = BACKEND_HOST.startsWith("localhost") || BACKEND_HOST.startsWith("127.0.0.1");
+const API_BASE = `${isLocal ? "http" : "https"}://${BACKEND_HOST}`;
+const WS_URL = `${isLocal ? "ws" : "wss"}://${BACKEND_HOST}/ws/alerts`;
+
+const SUN = 'M12 4V2M12 22v-2M4.93 4.93 3.51 3.51M20.49 20.49l-1.42-1.42M4 12H2M22 12h-2M4.93 19.07l-1.42 1.42M20.49 3.51l-1.42 1.42M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z';
+const MOON = 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z';
+function applyThemeIcon() {
+  const theme = document.documentElement.getAttribute("data-theme");
+  document.getElementById("themeIcon").innerHTML =
+    `<path d="${theme === 'dark' ? SUN : MOON}"/>`;
+}
+function initTheme() {
+  const saved = localStorage.getItem("smartcare-theme");
+  const theme = saved || "dark";
+  document.documentElement.setAttribute("data-theme", theme);
+  applyThemeIcon();
+}
+document.getElementById("themeToggle").addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("smartcare-theme", next);
+  applyThemeIcon();
+});
+initTheme();
+
+const demoToggle = document.getElementById("demoToggle");
+const demoDrawer = document.getElementById("demoDrawer");
+demoToggle.addEventListener("click", () => {
+  const open = demoDrawer.classList.toggle("open");
+  demoToggle.setAttribute("aria-expanded", open);
+});
+
+function sparkSvg(values, color) {
+  if (!values.length) {
+    return `<svg class="spark" viewBox="0 0 200 34" preserveAspectRatio="none"><line x1="0" y1="17" x2="200" y2="17" stroke="${color}" stroke-width="1" stroke-dasharray="3 4" opacity="0.4"/></svg>`;
+  }
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = (max - min) || 1;
+  const pts = values.map((v, i) => {
+    const x = (i / Math.max(values.length - 1, 1)) * 200;
+    const y = 30 - ((v - min) / range) * 26 - 2;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return `<svg class="spark" viewBox="0 0 200 34" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function statusColorHex(status) {
+  const styles = getComputedStyle(document.documentElement);
+  if (status === "red") return styles.getPropertyValue("--red").trim();
+  if (status === "amber") return styles.getPropertyValue("--amber").trim();
+  return styles.getPropertyValue("--green").trim();
+}
+
+let residentsCache = [];
+let openAlertsCache = [];
+let lastSyncAt = null;
+
+async function fetchAlerts() {
+  try {
+    const res = await fetch(`${API_BASE}/api/alerts?unresolved_only=true`);
+    openAlertsCache = await res.json();
+  } catch (e) {
+    console.error("Failed to load alerts", e);
+  }
+}
+
+async function fetchResidents() {
+  try {
+    const res = await fetch(`${API_BASE}/api/residents`);
+    residentsCache = await res.json();
+    lastSyncAt = Date.now();
+    await fetchAlerts();
+    renderDashboard();
+    populateDemoResidents(residentsCache);
+  } catch (e) {
+    console.error("Failed to load residents", e);
+  }
+}
+
+async function buildSparkline(residentId, color) {
+  try {
+    const hist = await fetch(`${API_BASE}/api/residents/${residentId}/history?limit=20`).then(x => x.json());
+    const values = hist.map(h => h.heart_rate).filter(v => v != null);
+    return sparkSvg(values, color);
+  } catch (e) {
+    return sparkSvg([], color);
+  }
+}
+
+function vitalsRowHtml(lr) {
+  return `
+    <div class="vitals-row">
+      <div class="stat"><div class="label">HR</div><div class="val">${lr.heart_rate ?? '--'}</div></div>
+      <div class="stat"><div class="label">SpO2</div><div class="val">${lr.spo2 ?? '--'}%</div></div>
+      <div class="stat"><div class="label">Temp</div><div class="val">${lr.temperature ?? '--'}°</div></div>
+    </div>`;
+}
+
+async function renderDashboard() {
+  const residents = residentsCache;
+  const needingAttentionIds = new Set(openAlertsCache.map(a => a.resident_id));
+  const attentionResidents = residents.filter(r => needingAttentionIds.has(r.id));
+  const stableResidents = residents.filter(r => !needingAttentionIds.has(r.id));
+
+  renderKpiRow(residents.length, openAlertsCache.length, stableResidents.length);
+  await renderAttentionFeed(attentionResidents);
+  renderStableGrid(stableResidents);
+}
+
+function renderKpiRow(total, alertCount, stableCount) {
+  const syncLabel = lastSyncAt ? `${Math.max(0, Math.round((Date.now() - lastSyncAt) / 1000))}s` : '--';
+  document.getElementById("kpiRow").innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Residents</div><div class="kpi-value">${total}</div></div>
+    <div class="kpi-card ${alertCount > 0 ? 'danger' : ''}"><div class="kpi-label">Active alerts</div><div class="kpi-value">${alertCount}</div></div>
+    <div class="kpi-card ok"><div class="kpi-label">Stable</div><div class="kpi-value">${stableCount}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Last sync</div><div class="kpi-value" id="lastSyncVal">${syncLabel}</div></div>
+  `;
+  document.getElementById("attentionCount").textContent = alertCount;
+  document.getElementById("stableCount").textContent = stableCount;
+}
+
+setInterval(() => {
+  const el = document.getElementById("lastSyncVal");
+  if (el && lastSyncAt) el.textContent = `${Math.max(0, Math.round((Date.now() - lastSyncAt) / 1000))}s`;
+}, 1000);
+
+async function renderAttentionFeed(attentionResidents) {
+  const feed = document.getElementById("attentionFeed");
+  if (!attentionResidents.length) {
+    feed.innerHTML = '<div class="empty-calm">All residents stable — no active alerts.</div>';
+    return;
+  }
+
+  const cards = await Promise.all(attentionResidents.map(async (r) => {
+    const lr = r.latest_reading || {};
+    const color = statusColorHex(r.status);
+    const spark = await buildSparkline(r.id, color);
+    const residentAlerts = openAlertsCache.filter(a => a.resident_id === r.id);
+    const alertRows = residentAlerts.map(a => `
+      <div class="incident-alert-row">
+        <div>
+          <div class="msg">${a.message}</div>
+          <div class="meta">${a.alert_type} · ${new Date(a.timestamp).toLocaleTimeString()}</div>
+        </div>
+        <button class="ack-btn" onclick="acknowledge(${a.id})">Acknowledge</button>
+      </div>`).join("");
+
+    return `
+      <div class="incident-card ${r.status}">
+        <div class="incident-head">
+          <h3>${r.name}</h3>
+          <span class="room">${r.room_no || '—'}</span>
+        </div>
+        <div class="incident-alerts">${alertRows}</div>
+        ${spark}
+        ${vitalsRowHtml(lr)}
+        <div class="updated-at">${lr.timestamp ? new Date(lr.timestamp).toLocaleTimeString() : 'no data'}</div>
+      </div>`;
+  }));
+  feed.innerHTML = cards.join("");
+}
+
+function renderStableGrid(stableResidents) {
+  const grid = document.getElementById("stableGrid");
+  if (!residentsCache.length) {
+    grid.innerHTML = '<div class="empty-note">No residents registered yet. POST to /api/residents to add one.</div>';
+    return;
+  }
+  if (!stableResidents.length) {
+    grid.innerHTML = '';
+    return;
+  }
+  grid.innerHTML = stableResidents.map(r => {
+    const lr = r.latest_reading || {};
+    return `
+      <div class="stable-tile">
+        <div class="name-row">
+          <h4>${r.name}</h4>
+          <span class="room">${r.room_no || '—'}</span>
+        </div>
+        <div class="hr-val">HR <b>${lr.heart_rate ?? '--'}</b></div>
+      </div>`;
+  }).join("");
+}
+
+async function acknowledge(alertId) {
+  const staffName = prompt("Your name (for the log):", "Staff");
+  if (!staffName) return;
+  try {
+    await fetch(`${API_BASE}/api/alerts/${alertId}/acknowledge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ staff_name: staffName }),
+    });
+    openAlertsCache = openAlertsCache.filter(a => a.id !== alertId);
+    renderDashboard();
+  } catch (e) {
+    console.error("Failed to acknowledge alert", e);
+  }
+}
+
+function connectWebSocket() {
+  const ws = new WebSocket(WS_URL);
+  const dot = document.getElementById("connDot");
+  const text = document.getElementById("connText");
+
+  ws.onopen = () => { dot.classList.add("live"); text.textContent = "live"; };
+  ws.onclose = () => {
+    dot.classList.remove("live"); text.textContent = "reconnecting…";
+    setTimeout(connectWebSocket, 3000);
+  };
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === "alert") {
+      if (!openAlertsCache.some(a => a.id === data.id)) {
+        openAlertsCache.push(data);
+      }
+      fetchResidents();
+    }
+  };
+  setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send("ping"); }, 15000);
+}
+
+function populateDemoResidents(residents) {
+  const sel = document.getElementById("demoResident");
+  const current = sel.value;
+  sel.innerHTML = residents.map(r => `<option value="${r.id}">${r.name} (${r.room_no || '—'})</option>`).join("");
+  if (current) sel.value = current;
+}
+
+function rand(min, max) { return Math.random() * (max - min) + min; }
+
+const SCENARIOS = {
+  normal: () => ({
+    heart_rate: rand(65, 85), spo2: rand(95, 99), temperature: rand(36.2, 37.1),
+    accel_magnitude: rand(0.9, 1.1), is_moving: Math.random() < 0.5,
+  }),
+  fall: () => ({
+    heart_rate: rand(90, 110), spo2: rand(93, 97), temperature: rand(36.2, 37.1),
+    accel_magnitude: rand(2.6, 4.0), is_moving: false,
+  }),
+  low_spo2: () => ({
+    heart_rate: rand(80, 100), spo2: rand(85, 91), temperature: rand(36.2, 37.4),
+    accel_magnitude: rand(0.9, 1.1), is_moving: false,
+  }),
+  inactivity: () => ({
+    heart_rate: rand(60, 70), spo2: rand(95, 98), temperature: rand(36.0, 36.8),
+    accel_magnitude: rand(0.98, 1.02), is_moving: false,
+  }),
+};
+
+async function runScenario(name) {
+  const residentId = document.getElementById("demoResident").value;
+  const statusEl = document.getElementById("demoStatus");
+  if (!residentId) { statusEl.textContent = "No resident selected — register one first."; return; }
+
+  const count = 5;
+  for (let i = 1; i <= count; i++) {
+    const reading = SCENARIOS[name]();
+    reading.resident_id = parseInt(residentId, 10);
+    Object.keys(reading).forEach(k => { if (typeof reading[k] === "number") reading[k] = Math.round(reading[k] * 10) / 10; });
+    try {
+      const resp = await fetch(`${API_BASE}/api/ingest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reading),
+      });
+      const data = await resp.json();
+      statusEl.textContent = `[${i}/${count}] sent ${name} reading → ${resp.status} (${data.alerts_raised ?? 0} alert${data.alerts_raised === 1 ? '' : 's'} raised)`;
+    } catch (e) {
+      statusEl.textContent = `Error sending reading: ${e.message}`;
+    }
+    await new Promise(r => setTimeout(r, 800));
+  }
+  fetchResidents();
+}
+
+fetchResidents();
+setInterval(fetchResidents, 10000);
+connectWebSocket();
+</script>
+
+</body>
+</html>

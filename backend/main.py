@@ -247,7 +247,20 @@ def list_alerts(unresolved_only: bool = True, db: Session = Depends(get_db)):
     query = db.query(models.Alert)
     if unresolved_only:
         query = query.filter(models.Alert.acknowledged == False)  # noqa: E712
-    return query.order_by(desc(models.Alert.timestamp)).all()
+    alerts = query.order_by(desc(models.Alert.timestamp)).all()
+    return [
+        {
+            "id": a.id,
+            "resident_id": a.resident_id,
+            "resident_name": a.resident.name if a.resident else None,
+            "alert_type": a.alert_type,
+            "severity": a.severity,
+            "message": a.message,
+            "acknowledged": a.acknowledged,
+            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+        }
+        for a in alerts
+    ]
 
 
 @app.post("/api/alerts/{alert_id}/acknowledge")

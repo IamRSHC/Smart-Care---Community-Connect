@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexaGen — SmartCare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0B1220;
+    --panel: #131B2C;
+    --line: #24304A;
+    --text: #E7ECF5;
+    --text-muted: #8792A8;
+    --text-dim: #5C6883;
+    --green: #2FB380;
+    --font-display: "Space Grotesk", sans-serif;
+    --font-body: "Inter", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  html[data-theme="light"] {
+    --ink: #F1F3F7;
+    --panel: #FFFFFF;
+    --line: #DDE3ED;
+    --text: #131B2C;
+    --text-muted: #5B657A;
+    --text-dim: #93A0B7;
+    --green: #17915E;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; color-scheme: dark; }
+  html[data-theme="light"] { color-scheme: light; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--font-body);
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+    .reveal { opacity: 1 !important; transform: none !important; }
+  }
+
+  section {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 24px;
+  }
+
+  /* ---- Hero ---- */
+  .hero .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(52px, 12vw, 130px);
+    letter-spacing: -2px;
+    margin: 0;
+    background: linear-gradient(180deg, var(--text) 40%, var(--green));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    margin-top: 22px;
+    max-width: 480px;
+  }
+  .scroll-cue {
+    margin-top: 48px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    animation: bob 2s ease-in-out infinite;
+  }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
+
+  /* ---- Reveal-on-scroll ---- */
+  .reveal {
+    opacity: 0;
+    transform: translateY(36px);
+    transition: opacity 0.7s cubic-bezier(.2,.8,.2,1), transform 0.7s cubic-bezier(.2,.8,.2,1);
+  }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+
+  /* ---- Mission ---- */
+  .mission { max-width: 760px; margin: 0 auto; }
+  .section-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--green);
+    text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+  .mission h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(28px, 4vw, 42px);
+    line-height: 1.25;
+    margin: 0 0 20px;
+  }
+  .mission p {
+    font-size: 15.5px;
+    line-height: 1.7;
+    color: var(--text-muted);
+    max-width: 620px;
+    margin: 0 auto;
+  }
+
+  /* ---- Stack strip ---- */
+  .stack-row {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+    margin-top: 36px;
+  }
+  .stack-chip {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    border: 1px solid var(--line);
+    background: var(--panel);
+    padding: 8px 16px;
+    border-radius: 999px;
+  }
+
+  /* ---- Dev card ---- */
+  .credit-wrap { max-width: 480px; margin: 0 auto; }
+  .dev-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 44px 40px 36px;
+    position: relative;
+    overflow: hidden;
+  }
+  .dev-card::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--green), transparent 70%);
+  }
+  .avatar {
+    width: 84px; height: 84px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    background: linear-gradient(160deg, #1c2740, var(--ink));
+    border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 26px;
+    color: var(--green);
+  }
+  .dev-card h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  .dev-card .handle {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--green);
+    margin-bottom: 14px;
+  }
+  .role-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border: 1px solid var(--line);
+    padding: 5px 12px;
+    border-radius: 999px;
+    margin-bottom: 18px;
+  }
+  .dev-card p.bio {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 0 0 22px;
+  }
+  .dev-links { display: flex; justify-content: center; gap: 10px; }
+  .dev-links a {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    border: 1px solid var(--line);
+    padding: 8px 16px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: border-color 0.2s ease, color 0.2s ease;
+  }
+  .dev-links a:hover { border-color: var(--green); color: var(--green); }
+
+  /* ---- CTA ---- */
+  .cta-btn {
+    margin-top: 40px;
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    letter-spacing: 0.5px;
+    color: var(--ink);
+    background: var(--green);
+    border: none;
+    padding: 15px 30px;
+    border-radius: 999px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(47,179,128,0.25); }
+
+  footer {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 30px 20px 40px;
+  }
+
+  .theme-toggle {
+    position: fixed;
+    top: 24px; right: 24px;
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 50;
+    transition: all 0.15s ease;
+  }
+  .theme-toggle:hover { color: var(--text); border-color: var(--green); }
+  .theme-toggle svg { width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme" title="Toggle light / dark theme">
+  <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+</button>
+
+<section class="hero">
+  <div class="eyebrow">Community Connect · 21GNP301L</div>
+  <h1>NexaGen</h1>
+  <p>The team behind SmartCare — an AI-assisted health &amp; activity monitoring prototype built for Sree Sai Saran Trust.</p>
+  <div class="scroll-cue">Scroll ↓</div>
+</section>
+
+<section>
+  <div class="mission reveal">
+    <div class="section-tag">The Problem</div>
+    <h2>Old age homes run on manual rounds and no digital record.</h2>
+    <p>Low staff-to-resident ratios mean delayed response to falls, abnormal vitals, and prolonged inactivity — with no continuous record of a resident's health or activity between checks. SmartCare closes that gap with low-cost sensors, rule-based anomaly detection, and a live caregiver dashboard.</p>
+    <div class="stack-row">
+      <span class="stack-chip">FastAPI</span>
+      <span class="stack-chip">PostgreSQL</span>
+      <span class="stack-chip">WebSockets</span>
+      <span class="stack-chip">ESP32</span>
+      <span class="stack-chip">Render</span>
+      <span class="stack-chip">Vercel</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="credit-wrap reveal">
+    <div class="section-tag">Built By</div>
+    <div class="dev-card">
+      <div class="avatar">RS</div>
+      <h3>R S Hareecharan</h3>
+      <div class="handle">@IamRSHC</div>
+      <div class="role-tag">Team Lead &amp; Lead Developer, NexaGen</div>
+      <p class="bio">B.Tech CSE (AI/ML), SRMIST Tiruchirappalli. Designed and built SmartCare end to end — backend, dashboard, deployment.</p>
+      <div class="dev-links">
+        <a href="https://github.com/IamRSHC" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="reveal" style="max-width: 520px;">
+    <div class="section-tag">Ready</div>
+    <h2 style="font-family: var(--font-display); font-weight: 600; font-size: clamp(26px, 4vw, 36px); margin: 0 0 8px;">Step into the dashboard</h2>
+    <p style="color: var(--text-muted); font-size: 14.5px; margin: 0;">Live resident monitoring, alerts, and demo controls.</p>
+    <a class="cta-btn" href="app.html">Enter Dashboard →</a>
+  </div>
+</section>
+
+<footer>Prototype · Community Connect 21GNP301L · Not medical-grade diagnostic information</footer>
+
+<script>
+const SUN = 'M12 4V2M12 22v-2M4.93 4.93 3.51 3.51M20.49 20.49l-1.42-1.42M4 12H2M22 12h-2M4.93 19.07l-1.42 1.42M20.49 3.51l-1.42 1.42M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z';
+const MOON = 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z';
+function applyThemeIcon() {
+  const theme = document.documentElement.getAttribute("data-theme");
+  document.getElementById("themeIcon").innerHTML = `<path d="${theme === 'dark' ? SUN : MOON}"/>`;
+}
+function initTheme() {
+  const saved = localStorage.getItem("smartcare-theme");
+  document.documentElement.setAttribute("data-theme", saved || "dark");
+  applyThemeIcon();
+}
+document.getElementById("themeToggle").addEventListener("click", () => {
+  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("smartcare-theme", next);
+  applyThemeIcon();
+});
+initTheme();
+
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) entry.target.classList.add("in");
+  });
+}, { threshold: 0.2 });
+
+document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>
