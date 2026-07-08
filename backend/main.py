@@ -150,7 +150,7 @@ def list_residents(db: Session = Depends(get_db)):
                 "heart_rate": latest.heart_rate if latest else None,
                 "spo2": latest.spo2 if latest else None,
                 "temperature": latest.temperature if latest else None,
-                "timestamp": latest.timestamp.isoformat() if latest else None,
+                "timestamp": (latest.timestamp.isoformat() + "Z") if latest and latest.timestamp else None,
             } if latest else None,
         })
     return result
@@ -165,7 +165,19 @@ def resident_history(resident_id: int, limit: int = 100, db: Session = Depends(g
         .limit(limit)
         .all()
     )
-    return list(reversed(readings))
+    return [
+        {
+            "id": r.id,
+            "resident_id": r.resident_id,
+            "heart_rate": r.heart_rate,
+            "spo2": r.spo2,
+            "temperature": r.temperature,
+            "accel_magnitude": r.accel_magnitude,
+            "is_moving": r.is_moving,
+            "timestamp": (r.timestamp.isoformat() + "Z") if r.timestamp else None,
+        }
+        for r in reversed(readings)
+    ]
 
 
 # ---------- Ingestion endpoint (called by ESP32 firmware or simulator) ----------
@@ -234,7 +246,7 @@ async def ingest_reading(payload: SensorPayload, db: Session = Depends(get_db)):
             "alert_type": alert.alert_type,
             "severity": alert.severity,
             "message": alert.message,
-            "timestamp": alert.timestamp.isoformat(),
+            "timestamp": alert.timestamp.isoformat() + "Z",
         })
 
     return {"status": "ok", "alerts_raised": len(new_alerts)}
@@ -257,7 +269,7 @@ def list_alerts(unresolved_only: bool = True, db: Session = Depends(get_db)):
             "severity": a.severity,
             "message": a.message,
             "acknowledged": a.acknowledged,
-            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+            "timestamp": (a.timestamp.isoformat() + "Z") if a.timestamp else None,
         }
         for a in alerts
     ]
