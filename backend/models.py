@@ -79,3 +79,19 @@ class MedicationLog(Base):
     given_at = Column(DateTime, nullable=True)
 
     resident = relationship("Resident", back_populates="medications")
+
+
+class PushSubscription(Base):
+    """
+    One row per staff phone that's tapped 'Enable alerts on this phone'.
+    Stores exactly what the browser's Push API gives us - endpoint is the
+    unique push service URL for that device/browser install, p256dh/auth
+    are the encryption keys needed to send it a message.
+    """
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    endpoint = Column(String, unique=True, nullable=False)
+    p256dh = Column(String, nullable=False)
+    auth = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -18,11 +18,53 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from pywebpush import webpush, WebPushException
+import json
 
 from database import Base, engine, get_db
 import models
 from anomaly import evaluate_reading
 from ai_summary import build_daily_summary
+
+# ---------- Web Push (staff phone notifications) ----------
+# VAPID_PRIVATE_KEY is set on Render (Environment tab, sync: false in render.yaml).
+# The matching public key lives in dashboard/app.html as VAPID_PUBLIC_KEY - it's
+# safe to expose client-side by design, the private key never leaves the server.
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY")
+VAPID_CLAIMS = {"sub": "mailto:smartcare-alerts@example.com"}
+
+
+def send_push_to_staff(title: str, body: str, db: Session):
+    """
+    Push a notification to every staff phone that's subscribed. Runs best-
+    effort per subscription - one dead/expired subscription (phone lost,
+    browser data cleared, notifications revoked) must never block delivery
+    to everyone else. Dead subscriptions (410/404 from the push service)
+    are deleted so the table doesn't accumulate stale devices forever.
+    """
+    if not VAPID_PRIVATE_KEY:
+        return  # not configured yet - fail silently, don't break ingestion
+    subs = db.query(models.PushSubscription).all()
+    for sub in subs:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub.endpoint,
+                    "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
+                },
+                data=json.dumps({"title": title, "body": body}),
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims=dict(VAPID_CLAIMS),
+            )
+        except WebPushException as e:
+            status = e.response.status_code if e.response is not None else None
+            if status in (404, 410):
+                db.query(models.PushSubscription).filter(
+                    models.PushSubscription.id == sub.id
+                ).delete()
+                db.commit()
+            else:
+                print(f"Push failed for subscription {sub.id}: {e}")
 
 Base.metadata.create_all(bind=engine)
 
@@ -248,8 +290,46 @@ async def ingest_reading(payload: SensorPayload, db: Session = Depends(get_db)):
             "message": alert.message,
             "timestamp": alert.timestamp.isoformat() + "Z",
         })
+        send_push_to_staff(
+            title=f"SmartCare — {resident.name}",
+            body=alert.message,
+            db=db,
+        )
 
     return {"status": "ok", "alerts_raised": len(new_alerts)}
+
+
+# ---------- Push subscriptions (staff phones) ----------
+
+class PushSubscribePayload(BaseModel):
+    endpoint: str
+    keys: dict
+
+
+@app.post("/api/push/subscribe")
+def push_subscribe(payload: PushSubscribePayload, db: Session = Depends(get_db)):
+    existing = db.query(models.PushSubscription).filter(
+        models.PushSubscription.endpoint == payload.endpoint
+    ).first()
+    if existing:
+        return {"status": "already_subscribed"}
+    sub = models.PushSubscription(
+        endpoint=payload.endpoint,
+        p256dh=payload.keys.get("p256dh", ""),
+        auth=payload.keys.get("auth", ""),
+    )
+    db.add(sub)
+    db.commit()
+    return {"status": "subscribed"}
+
+
+@app.post("/api/push/unsubscribe")
+def push_unsubscribe(payload: PushSubscribePayload, db: Session = Depends(get_db)):
+    db.query(models.PushSubscription).filter(
+        models.PushSubscription.endpoint == payload.endpoint
+    ).delete()
+    db.commit()
+    return {"status": "unsubscribed"}
 
 
 # ---------- Alerts ----------

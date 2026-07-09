@@ -419,6 +419,9 @@
     </a>
   </div>
   <div class="header-controls">
+    <button class="demo-toggle" id="pushToggle" type="button" title="Get alerts pushed to this phone even when this tab is closed">
+      🔔 <span id="pushToggleLabel">Enable alerts on this phone</span>
+    </button>
     <button class="demo-toggle" id="demoToggle" type="button" aria-expanded="false">
       <span class="tag">SIM</span> Demo controls
     </button>
@@ -464,6 +467,11 @@ const BACKEND_HOST = "smartcare-backend-pcc5.onrender.com";
 const isLocal = BACKEND_HOST.startsWith("localhost") || BACKEND_HOST.startsWith("127.0.0.1");
 const API_BASE = `${isLocal ? "http" : "https"}://${BACKEND_HOST}`;
 const WS_URL = `${isLocal ? "ws" : "wss"}://${BACKEND_HOST}/ws/alerts`;
+
+// Public VAPID key - safe to expose client-side, this is what proves to the
+// browser's push service that pushes claiming to be from this app really
+// are from this app's server (which holds the matching private key).
+const VAPID_PUBLIC_KEY = "BFhASyL6l_-6bSnPas5a7xA7NJCWbYrd19rsDYPXUfSOGjByvwXHiAmOMFjfhuhITX7BZJk58n7doLtYWc8culk";
 
 const SUN = 'M12 4V2M12 22v-2M4.93 4.93 3.51 3.51M20.49 20.49l-1.42-1.42M4 12H2M22 12h-2M4.93 19.07l-1.42 1.42M20.49 3.51l-1.42 1.42M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z';
 const MOON = 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z';
@@ -757,6 +765,74 @@ async function runScenario(name) {
 fetchResidents();
 setInterval(fetchResidents, 10000);
 connectWebSocket();
+
+// ---------- Staff phone push notifications ----------
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+const pushBtn = document.getElementById("pushToggle");
+const pushLabel = document.getElementById("pushToggleLabel");
+
+async function getExistingPushSubscription() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  const reg = await navigator.serviceWorker.getRegistration();
+  if (!reg) return null;
+  return reg.pushManager.getSubscription();
+}
+
+async function refreshPushButtonState() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    pushBtn.style.display = "none"; // unsupported browser - don't show a button that can't work
+    return;
+  }
+  const existing = await getExistingPushSubscription();
+  pushLabel.textContent = existing ? "Alerts enabled ✓" : "Enable alerts on this phone";
+}
+
+async function enablePushNotifications() {
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      pushLabel.textContent = "Notifications blocked";
+      return;
+    }
+    const reg = await navigator.serviceWorker.register("sw.js");
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    await fetch(`${API_BASE}/api/push/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub.toJSON()),
+    });
+    pushLabel.textContent = "Alerts enabled ✓";
+  } catch (e) {
+    console.error("Push subscription failed", e);
+    pushLabel.textContent = "Enable alerts on this phone";
+  }
+}
+
+pushBtn.addEventListener("click", async () => {
+  const existing = await getExistingPushSubscription();
+  if (existing) {
+    // already enabled - tapping again just confirms status, doesn't unsubscribe,
+    // to avoid a staff member accidentally turning off alerts with one tap
+    pushLabel.textContent = "Alerts enabled ✓";
+    return;
+  }
+  enablePushNotifications();
+});
+
+refreshPushButtonState();
 </script>
 
 </body>

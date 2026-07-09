@@ -23,3 +23,5 @@ services:
         value: "*"        # replace with your Vercel URL once you have it, e.g. https://smartcare-dashboard.vercel.app
       - key: ANTHROPIC_API_KEY
         sync: false        # set this manually in the Render dashboard (Environment tab) - don't commit real keys to git
+      - key: VAPID_PRIVATE_KEY
+        sync: false        # set manually in Render dashboard - staff phone push notifications won't send without this
