@@ -10,7 +10,7 @@ On Render, the start command is:
 (see render.yaml)
 """
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, HTTPException
@@ -382,6 +382,85 @@ def acknowledge_all_for_resident(resident_id: int, payload: AckPayload, db: Sess
         alert.acknowledged_at = now
     db.commit()
     return {"status": "ok", "acknowledged_count": len(alerts)}
+
+
+# ---------- Medication log ----------
+# FR6 in the PRD (medication reminders + compliance logging). The
+# MedicationLog table has existed since the original scaffold but was only
+# ever read internally for the AI daily summary - there was no way to
+# actually schedule a dose or mark one given until these three endpoints.
+
+class MedicationCreate(BaseModel):
+    resident_id: int
+    medicine_name: str
+    scheduled_time: str  # ISO string, e.g. from JS Date.toISOString() - "...Z"
+
+
+@app.post("/api/medications")
+def create_medication(payload: MedicationCreate, db: Session = Depends(get_db)):
+    resident = db.query(models.Resident).filter(models.Resident.id == payload.resident_id).first()
+    if not resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+    try:
+        scheduled = datetime.fromisoformat(payload.scheduled_time.replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="scheduled_time must be a valid ISO datetime string")
+
+    med = models.MedicationLog(
+        resident_id=payload.resident_id,
+        medicine_name=payload.medicine_name,
+        scheduled_time=scheduled,
+    )
+    db.add(med)
+    db.commit()
+    db.refresh(med)
+    return {"status": "scheduled", "id": med.id}
+
+
+@app.get("/api/medications/today")
+def medications_today(db: Session = Depends(get_db)):
+    now = datetime.utcnow()
+    day_start = datetime(now.year, now.month, now.day)
+    day_end = day_start + timedelta(days=1)
+
+    meds = (
+        db.query(models.MedicationLog)
+        .filter(models.MedicationLog.scheduled_time >= day_start, models.MedicationLog.scheduled_time < day_end)
+        .order_by(models.MedicationLog.scheduled_time)
+        .all()
+    )
+
+    result = []
+    for m in meds:
+        if m.given:
+            status = "given"
+        elif m.scheduled_time <= now:
+            status = "missed"
+        else:
+            status = "due"
+        resident = db.query(models.Resident).filter(models.Resident.id == m.resident_id).first()
+        result.append({
+            "id": m.id,
+            "resident_id": m.resident_id,
+            "resident_name": resident.name if resident else "Unknown",
+            "medicine_name": m.medicine_name,
+            "scheduled_time": m.scheduled_time.isoformat() + "Z",
+            "given": m.given,
+            "given_at": (m.given_at.isoformat() + "Z") if m.given_at else None,
+            "status": status,
+        })
+    return result
+
+
+@app.post("/api/medications/{med_id}/give")
+def mark_medication_given(med_id: int, db: Session = Depends(get_db)):
+    med = db.query(models.MedicationLog).filter(models.MedicationLog.id == med_id).first()
+    if not med:
+        raise HTTPException(status_code=404, detail="Medication log not found")
+    med.given = True
+    med.given_at = datetime.utcnow()
+    db.commit()
+    return {"status": "given"}
 
 
 # ---------- AI daily summary (Claude) ----------

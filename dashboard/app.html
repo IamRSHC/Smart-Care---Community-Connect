@@ -67,6 +67,14 @@
     outline-offset: 2px;
   }
 
+  /* Scroll stays functional (mouse wheel / touch / keyboard) everywhere -
+     this only hides the visible track/thumb so the page reads as clean
+     rather than boxed-in by a scrollbar the moment content grows. */
+  html { scrollbar-width: none; -ms-overflow-style: none; }
+  html::-webkit-scrollbar { display: none; }
+  #attentionFeed { scrollbar-width: none; -ms-overflow-style: none; }
+  #attentionFeed::-webkit-scrollbar { display: none; }
+
   header {
     position: sticky;
     top: 0;
@@ -235,6 +243,12 @@
   }
   .sim-btn:hover { border-color: var(--accent); }
   .sim-btn.warn:hover { border-color: var(--red); color: var(--red); }
+  .sim-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .sim-btn.active:hover { border-color: var(--accent); color: white; }
   .demo-status {
     font-family: var(--font-mono);
     font-size: 11.5px;
@@ -419,13 +433,73 @@
   .trend-threshold-line { stroke: var(--red); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.7; }
   .trend-empty { color: var(--text-dim); font-size: 13px; padding: 30px 0; text-align: center; }
 
-  footer {
-    text-align: right;
-    font-size: 10px;
-    color: var(--text-dim);
-    padding: 8px 16px;
-    opacity: 0.6;
+  /* ---------- Medication log ---------- */
+  .bottom-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 30px;
   }
+  @media (max-width: 900px) {
+    .bottom-panels { grid-template-columns: 1fr; }
+  }
+  .med-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .med-panel .trend-head { margin-bottom: 12px; }
+  .med-add-form {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .med-add-form select, .med-add-form input {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--ink);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 7px 9px;
+  }
+  .med-add-form input[type="text"] { flex: 1; min-width: 110px; }
+  .med-add-btn {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border: 1px solid var(--line);
+    background: var(--accent);
+    color: white;
+    padding: 7px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .med-add-btn:hover { opacity: 0.9; }
+  .med-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .med-list::-webkit-scrollbar { display: none; }
+  .med-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 12px;
+  }
+  .med-row .med-info .name { font-size: 13px; font-weight: 500; }
+  .med-row .med-info .meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); margin-top: 2px; }
+  .med-status-pill {
+    font-family: var(--font-mono); font-size: 10.5px;
+    padding: 3px 9px; border-radius: 999px;
+    white-space: nowrap;
+  }
+  .med-status-pill.given { background: var(--green-glow); color: var(--green); }
+  .med-status-pill.due { background: rgba(76,141,255,0.15); color: var(--accent); }
+  .med-status-pill.missed { background: var(--red-glow); color: var(--red); }
+  .med-give-btn {
+    font-family: var(--font-mono); font-size: 10.5px;
+    border: 1px solid var(--line); background: transparent; color: var(--text-muted);
+    padding: 5px 10px; border-radius: 6px; cursor: pointer;
+  }
+  .med-give-btn:hover { background: var(--green); color: white; border-color: var(--green); }
 
   @media (max-width: 640px) {
     header { padding: 14px 16px; }
@@ -483,10 +557,10 @@
     <p class="demo-note">For demoing without ESP32 hardware connected. Sends a short burst of readings straight to the backend — the same endpoint real sensors post to. Not part of the caregiver workflow.</p>
     <div class="demo-row">
       <select id="demoResident"></select>
-      <button class="sim-btn" onclick="runScenario('normal')">Normal</button>
-      <button class="sim-btn warn" onclick="runScenario('fall')">Fall</button>
-      <button class="sim-btn warn" onclick="runScenario('low_spo2')">Low SpO2</button>
-      <button class="sim-btn warn" onclick="runScenario('inactivity')">Inactivity</button>
+      <button class="sim-btn" data-scenario="normal" onclick="runScenario('normal')">Normal</button>
+      <button class="sim-btn warn" data-scenario="fall" onclick="runScenario('fall')">Fall</button>
+      <button class="sim-btn warn" data-scenario="low_spo2" onclick="runScenario('low_spo2')">Low SpO2</button>
+      <button class="sim-btn warn" data-scenario="inactivity" onclick="runScenario('inactivity')">Inactivity</button>
     </div>
     <div class="demo-status" id="demoStatus"></div>
   </div>
@@ -501,16 +575,30 @@
   <div class="section-title">Stable <span class="count" id="stableCount">0</span></div>
   <div class="stable-grid" id="stableGrid"></div>
 
-  <div class="trend-panel">
-    <div class="trend-head">
-      <select id="trendResident"></select>
-      <span class="trend-legend">SpO2 · dashed line = safe threshold</span>
+  <div class="bottom-panels">
+    <div class="med-panel">
+      <div class="trend-head">
+        <span class="section-title" style="margin:0;">Medication log — today <span class="count" id="medCount">0</span></span>
+      </div>
+      <div class="med-add-form">
+        <select id="medResident"></select>
+        <input type="text" id="medName" placeholder="Medicine name" />
+        <input type="time" id="medTime" />
+        <button class="med-add-btn" onclick="scheduleMedication()">Schedule</button>
+      </div>
+      <div class="med-list" id="medList"><div class="trend-empty">Loading…</div></div>
     </div>
-    <div id="trendChartWrap"><div class="trend-empty">Loading…</div></div>
+
+    <div class="trend-panel">
+      <div class="trend-head">
+        <select id="trendResident"></select>
+        <span class="trend-legend">SpO2 · dashed line = safe threshold</span>
+      </div>
+      <div id="trendChartWrap"><div class="trend-empty">Loading…</div></div>
+    </div>
   </div>
 </main>
 
-<footer>Prototype dashboard · Community Connect 21GNP301L · Data shown is not medical-grade diagnostic information</footer>
 
 <script>
 const BACKEND_HOST = "smartcare-backend-pcc5.onrender.com";
@@ -599,6 +687,7 @@ async function fetchResidents() {
     populateDemoResidents(residentsCache);
     populateTrendResidents(residentsCache);
     renderTrendChart();
+    populateMedResidents(residentsCache);
   } catch (e) {
     console.error("Failed to load residents", e);
   }
@@ -848,6 +937,88 @@ async function renderTrendChart() {
 
 trendSelect.addEventListener("change", renderTrendChart);
 
+// ---------- Medication log ----------
+let medsCache = [];
+
+function populateMedResidents(residents) {
+  const sel = document.getElementById("medResident");
+  const current = sel.value;
+  sel.innerHTML = residents.map(r => `<option value="${r.id}">${r.name} (${r.room_no || '—'})</option>`).join("");
+  if (current && residents.some(r => String(r.id) === current)) sel.value = current;
+}
+
+async function fetchMedications() {
+  try {
+    const res = await fetch(`${API_BASE}/api/medications/today`);
+    medsCache = await res.json();
+    renderMedicationLog();
+  } catch (e) {
+    console.error("Failed to load medications", e);
+  }
+}
+
+function renderMedicationLog() {
+  const list = document.getElementById("medList");
+  document.getElementById("medCount").textContent = medsCache.length;
+
+  if (!medsCache.length) {
+    list.innerHTML = '<div class="trend-empty">No doses scheduled today.</div>';
+    return;
+  }
+
+  list.innerHTML = medsCache.map(m => `
+    <div class="med-row">
+      <div class="med-info">
+        <div class="name">${m.resident_name} — ${m.medicine_name}</div>
+        <div class="meta">${new Date(m.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${m.given_at ? ` · given ${new Date(m.given_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</div>
+      </div>
+      ${m.status === "given"
+        ? '<span class="med-status-pill given">Given</span>'
+        : `<span class="med-status-pill ${m.status}">${m.status === "missed" ? "Missed" : "Due"}</span>
+           <button class="med-give-btn" onclick="markMedicationGiven(${m.id})">Mark given</button>`
+      }
+    </div>`).join("");
+}
+
+async function scheduleMedication() {
+  const residentId = document.getElementById("medResident").value;
+  const medName = document.getElementById("medName").value.trim();
+  const timeVal = document.getElementById("medTime").value; // "HH:MM"
+  if (!residentId || !medName || !timeVal) {
+    alert("Pick a resident, enter a medicine name, and set a time.");
+    return;
+  }
+  const [hh, mm] = timeVal.split(":").map(Number);
+  const scheduled = new Date();
+  scheduled.setHours(hh, mm, 0, 0);
+
+  try {
+    await fetch(`${API_BASE}/api/medications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        resident_id: parseInt(residentId, 10),
+        medicine_name: medName,
+        scheduled_time: scheduled.toISOString(),
+      }),
+    });
+    document.getElementById("medName").value = "";
+    document.getElementById("medTime").value = "";
+    fetchMedications();
+  } catch (e) {
+    console.error("Failed to schedule medication", e);
+  }
+}
+
+async function markMedicationGiven(medId) {
+  try {
+    await fetch(`${API_BASE}/api/medications/${medId}/give`, { method: "POST" });
+    fetchMedications();
+  } catch (e) {
+    console.error("Failed to mark medication given", e);
+  }
+}
+
 function rand(min, max) { return Math.random() * (max - min) + min; }
 
 const SCENARIOS = {
@@ -874,6 +1045,10 @@ async function runScenario(name) {
   const statusEl = document.getElementById("demoStatus");
   if (!residentId) { statusEl.textContent = "No resident selected — register one first."; return; }
 
+  document.querySelectorAll(".sim-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.scenario === name);
+  });
+
   const count = 5;
   for (let i = 1; i <= count; i++) {
     const reading = SCENARIOS[name]();
@@ -897,6 +1072,8 @@ async function runScenario(name) {
 
 fetchResidents();
 setInterval(fetchResidents, 10000);
+fetchMedications();
+setInterval(fetchMedications, 30000);
 connectWebSocket();
 
 // ---------- Staff phone push notifications ----------
