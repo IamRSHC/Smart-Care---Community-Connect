@@ -188,6 +188,7 @@ def list_residents(db: Session = Depends(get_db)):
             "room_no": r.room_no,
             "status": status,
             "open_alerts": open_alerts,
+            "spo2_min": r.spo2_min,
             "latest_reading": {
                 "heart_rate": latest.heart_rate if latest else None,
                 "spo2": latest.spo2 if latest else None,

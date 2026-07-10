@@ -163,6 +163,18 @@
     transition: all 0.15s ease;
   }
   .demo-toggle:hover { color: var(--text); border-color: var(--accent); }
+  .consent-pill {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 7px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .consent-pill svg { width: 12px; height: 12px; flex-shrink: 0; }
   .demo-toggle .tag {
     background: var(--accent);
     color: white;
@@ -382,6 +394,31 @@
   .stable-tile .hr-val { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); }
   .stable-tile .hr-val b { color: var(--text); font-size: 15px; }
 
+  /* ---------- Trend panel ---------- */
+  .trend-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-top: 30px;
+  }
+  .trend-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+  .trend-head select {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--ink);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .trend-legend { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); }
+  .trend-svg { display: block; width: 100%; height: 220px; }
+  .trend-axis-label { font-family: var(--font-mono); font-size: 9px; fill: var(--text-dim); }
+  .trend-grid-line { stroke: var(--line); stroke-width: 1; }
+  .trend-threshold-line { stroke: var(--red); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.7; }
+  .trend-empty { color: var(--text-dim); font-size: 13px; padding: 30px 0; text-align: center; }
+
   footer {
     text-align: right;
     font-size: 10px;
@@ -419,6 +456,12 @@
     </a>
   </div>
   <div class="header-controls">
+    <div class="consent-pill">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+      </svg>
+      Consented residents only
+    </div>
     <button class="demo-toggle" id="pushToggle" type="button" title="Get alerts pushed to this phone even when this tab is closed">
       🔔 <span id="pushToggleLabel">Enable alerts on this phone</span>
     </button>
@@ -457,6 +500,14 @@
 
   <div class="section-title">Stable <span class="count" id="stableCount">0</span></div>
   <div class="stable-grid" id="stableGrid"></div>
+
+  <div class="trend-panel">
+    <div class="trend-head">
+      <select id="trendResident"></select>
+      <span class="trend-legend">SpO2 · dashed line = safe threshold</span>
+    </div>
+    <div id="trendChartWrap"><div class="trend-empty">Loading…</div></div>
+  </div>
 </main>
 
 <footer>Prototype dashboard · Community Connect 21GNP301L · Data shown is not medical-grade diagnostic information</footer>
@@ -546,6 +597,8 @@ async function fetchResidents() {
     await fetchAlerts();
     renderDashboard();
     populateDemoResidents(residentsCache);
+    populateTrendResidents(residentsCache);
+    renderTrendChart();
   } catch (e) {
     console.error("Failed to load residents", e);
   }
@@ -714,6 +767,86 @@ function populateDemoResidents(residents) {
   sel.innerHTML = residents.map(r => `<option value="${r.id}">${r.name} (${r.room_no || '—'})</option>`).join("");
   if (current) sel.value = current;
 }
+
+// ---------- Trend chart ----------
+const trendSelect = document.getElementById("trendResident");
+let trendInitialized = false;
+
+function populateTrendResidents(residents) {
+  const current = trendSelect.value;
+  trendSelect.innerHTML = residents.map(r => `<option value="${r.id}">${r.name} (${r.room_no || '—'})</option>`).join("");
+  if (current && residents.some(r => String(r.id) === current)) {
+    trendSelect.value = current;
+  } else if (!trendInitialized && residents.length) {
+    // default to whoever needs attention, otherwise just the first resident -
+    // showing a stable line by default is a wasted first impression
+    const attentionId = openAlertsCache[0]?.resident_id;
+    trendSelect.value = attentionId ?? residents[0].id;
+  }
+  trendInitialized = true;
+}
+
+function buildTrendSvg(readings, threshold, lineColor) {
+  const W = 900, H = 220, padL = 38, padR = 12, padT = 14, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  const values = readings.map(r => r.spo2).filter(v => v != null);
+  if (!values.length) return null;
+
+  const dataMin = Math.min(...values);
+  const dataMax = Math.max(...values);
+  const yMin = Math.floor(Math.min(dataMin, threshold) - 2);
+  const yMax = Math.ceil(Math.max(dataMax, threshold) + 2);
+  const yRange = (yMax - yMin) || 1;
+
+  const x = i => padL + (i / Math.max(readings.length - 1, 1)) * plotW;
+  const y = v => padT + plotH - ((v - yMin) / yRange) * plotH;
+
+  const linePts = readings.map((r, i) => `${x(i).toFixed(1)},${y(r.spo2).toFixed(1)}`).join(" ");
+  const threshY = y(threshold).toFixed(1);
+
+  // y-axis gridlines/labels at yMin, midpoint, yMax
+  const yTicks = [yMin, Math.round((yMin + yMax) / 2), yMax];
+  const yTickEls = yTicks.map(v => `
+    <line class="trend-grid-line" x1="${padL}" y1="${y(v).toFixed(1)}" x2="${W - padR}" y2="${y(v).toFixed(1)}"/>
+    <text class="trend-axis-label" x="4" y="${(+y(v) + 3).toFixed(1)}">${v}%</text>
+  `).join("");
+
+  // x-axis: first / middle / last timestamps only, keeps it honest about actual data span
+  const tickIdxs = [0, Math.floor((readings.length - 1) / 2), readings.length - 1];
+  const xTickEls = [...new Set(tickIdxs)].map(i => `
+    <text class="trend-axis-label" x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${new Date(readings[i].timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</text>
+  `).join("");
+
+  return `
+    <svg class="trend-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${yTickEls}
+      <line class="trend-threshold-line" x1="${padL}" y1="${threshY}" x2="${W - padR}" y2="${threshY}"/>
+      <text class="trend-axis-label" x="${W - padR}" y="${(+threshY - 5).toFixed(1)}" text-anchor="end" fill="var(--red)">threshold ${threshold}%</text>
+      <polyline points="${linePts}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${xTickEls}
+    </svg>`;
+}
+
+async function renderTrendChart() {
+  const wrap = document.getElementById("trendChartWrap");
+  const residentId = trendSelect.value;
+  if (!residentId) { wrap.innerHTML = '<div class="trend-empty">No residents yet.</div>'; return; }
+
+  const resident = residentsCache.find(r => String(r.id) === String(residentId));
+  const threshold = resident?.spo2_min ?? 92;
+  const lineColor = statusColorHex(resident?.status ?? "green");
+
+  try {
+    const hist = await fetch(`${API_BASE}/api/residents/${residentId}/history?limit=30`).then(x => x.json());
+    const chart = buildTrendSvg(hist, threshold, lineColor);
+    wrap.innerHTML = chart || '<div class="trend-empty">No readings yet for this resident.</div>';
+  } catch (e) {
+    wrap.innerHTML = '<div class="trend-empty">Failed to load trend data.</div>';
+  }
+}
+
+trendSelect.addEventListener("change", renderTrendChart);
 
 function rand(min, max) { return Math.random() * (max - min) + min; }
 
