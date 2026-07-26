@@ -506,6 +506,27 @@
     main { padding: 20px 16px 60px; }
     .brand h1 { font-size: 17px; }
   }
+
+  /* ── Language toggle ── */
+  .lang-btn {
+    height: 34px;
+    padding: 0 11px;
+    border-radius: 9px;
+    border: 1px solid var(--accent);
+    background: var(--panel);
+    color: var(--accent);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .lang-btn:hover { background: var(--accent); color: #fff; }
 </style>
 </head>
 <body>
@@ -540,9 +561,10 @@
       🔔 <span id="pushToggleLabel">Enable alerts on this phone</span>
     </button>
     <button class="demo-toggle" id="demoToggle" type="button" aria-expanded="false">
-      <span class="tag">SIM</span> Demo controls
+      <span class="tag">SIM</span> <span id="labelDemoControls">Demo controls</span>
     </button>
     <div class="conn-pill"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></div>
+    <button class="lang-btn" id="langToggle" type="button" title="Switch to Tamil / தமிழில் மாறு"><span id="langLabel">த</span></button>
     <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle theme" title="Toggle light / dark theme">
       <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
     </button>
@@ -552,15 +574,15 @@
 <div id="demoDrawer">
   <div class="demo-panel">
     <div class="demo-head">
-      <h4>Simulate sensor data</h4>
+      <h4 id="labelSimulate">Simulate sensor data</h4>
     </div>
-    <p class="demo-note">For demoing without ESP32 hardware connected. Sends a short burst of readings straight to the backend — the same endpoint real sensors post to. Not part of the caregiver workflow.</p>
+    <p class="demo-note" id="labelSimNote">For demoing without ESP32 hardware connected. Sends a short burst of readings straight to the backend — the same endpoint real sensors post to. Not part of the caregiver workflow.</p>
     <div class="demo-row">
       <select id="demoResident"></select>
-      <button class="sim-btn" data-scenario="normal" onclick="runScenario('normal')">Normal</button>
-      <button class="sim-btn warn" data-scenario="fall" onclick="runScenario('fall')">Fall</button>
-      <button class="sim-btn warn" data-scenario="low_spo2" onclick="runScenario('low_spo2')">Low SpO2</button>
-      <button class="sim-btn warn" data-scenario="inactivity" onclick="runScenario('inactivity')">Inactivity</button>
+      <button class="sim-btn" data-scenario="normal" id="btnSimNormal" onclick="runScenario('normal')">Normal</button>
+      <button class="sim-btn warn" data-scenario="fall" id="btnSimFall" onclick="runScenario('fall')">Fall</button>
+      <button class="sim-btn warn" data-scenario="low_spo2" id="btnSimLowSpo2" onclick="runScenario('low_spo2')">Low SpO2</button>
+      <button class="sim-btn warn" data-scenario="inactivity" id="btnSimInactivity" onclick="runScenario('inactivity')">Inactivity</button>
     </div>
     <div class="demo-status" id="demoStatus"></div>
   </div>
@@ -569,22 +591,22 @@
 <main>
   <div class="kpi-row" id="kpiRow"></div>
 
-  <div class="section-title">Needs attention <span class="count" id="attentionCount">0</span></div>
+  <div class="section-title"><span id="labelNeedsAttention">Needs attention</span> <span class="count" id="attentionCount">0</span></div>
   <div id="attentionFeed"><div class="empty-note">Loading…</div></div>
 
-  <div class="section-title">Stable <span class="count" id="stableCount">0</span></div>
+  <div class="section-title"><span id="labelStable">Stable</span> <span class="count" id="stableCount">0</span></div>
   <div class="stable-grid" id="stableGrid"></div>
 
   <div class="bottom-panels">
     <div class="med-panel">
       <div class="trend-head">
-        <span class="section-title" style="margin:0;">Medication log — today <span class="count" id="medCount">0</span></span>
+        <span class="section-title" style="margin:0;"><span id="labelMedLog">Medication log — today</span> <span class="count" id="medCount">0</span></span>
       </div>
       <div class="med-add-form">
         <select id="medResident"></select>
         <input type="text" id="medName" placeholder="Medicine name" />
         <input type="time" id="medTime" />
-        <button class="med-add-btn" onclick="scheduleMedication()">Schedule</button>
+        <button class="med-add-btn" id="medAddBtn" onclick="scheduleMedication()">Schedule</button>
       </div>
       <div class="med-list" id="medList"><div class="trend-empty">Loading…</div></div>
     </div>
@@ -592,7 +614,7 @@
     <div class="trend-panel">
       <div class="trend-head">
         <select id="trendResident"></select>
-        <span class="trend-legend">SpO2 · dashed line = safe threshold</span>
+        <span class="trend-legend" id="labelTrendLegend">SpO2 · dashed line = safe threshold</span>
       </div>
       <div id="trendChartWrap"><div class="trend-empty">Loading…</div></div>
     </div>
@@ -601,6 +623,187 @@
 
 
 <script>
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  LANGUAGE SYSTEM  (Tamil / English toggle)
+//  t(key) is the only function all render code needs to call.
+//  applyLangToStatic() patches the handful of static HTML elements that
+//  aren't re-rendered by JS on every data refresh.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const STRINGS = {
+  en: {
+    // Section / panel titles
+    needsAttention:  "Needs attention",
+    stable:          "Stable",
+    medLog:          "Medication log — today",
+    trendLegend:     "SpO2 · dashed line = safe threshold",
+    demoControls:    "Demo controls",
+    // Demo panel
+    simulate:        "Simulate sensor data",
+    simNote:         "For demoing without ESP32 hardware connected. Sends a short burst of readings straight to the backend — the same endpoint real sensors post to. Not part of the caregiver workflow.",
+    normal:          "Normal",
+    fall:            "Fall",
+    lowSpo2:         "Low SpO2",
+    inactivity:      "Inactivity",
+    // Medication log
+    medicineName:    "Medicine name",
+    schedule:        "Schedule",
+    given:           "Given",
+    givenLower:      "given",
+    missed:          "Missed",
+    due:             "Due",
+    markGiven:       "Mark given",
+    noDosesToday:    "No doses scheduled today.",
+    // KPI strip
+    residents:       "Residents",
+    activeAlerts:    "Active alerts",
+    lastSync:        "Last sync",
+    // Vitals labels (abbreviated for the small stat boxes)
+    hr:              "HR",
+    spo2:            "SpO2",
+    temp:            "Temp",
+    // Connection pill
+    live:            "live",
+    reconnecting:    "reconnecting\u2026",
+    connecting:      "connecting\u2026",
+    // Dashboard states
+    allStable:       "All residents stable \u2014 no active alerts.",
+    loading:         "Loading\u2026",
+    noResidents:     "No residents registered yet. POST to /api/residents to add one.",
+    noReadings:      "No readings yet for this resident.",
+    failedTrend:     "Failed to load trend data.",
+    noResidentsYet:  "No residents yet.",
+    noData:          "no data",
+    // Acknowledge
+    acknowledgeAll:  "Acknowledge all",
+    staffNamePrompt: "Your name (for the log):",
+    staff:           "Staff",
+    // Push notifications
+    enableAlerts:    "Enable alerts on this phone",
+    alertsEnabled:   "Alerts enabled \u2713",
+    notifBlocked:    "Notifications blocked",
+    // Demo simulator
+    noResidentSim:   "No resident selected \u2014 register one first.",
+    // Medication form
+    medFormError:    "Pick a resident, enter a medicine name, and set a time.",
+  },
+  ta: {
+    // Section / panel titles
+    needsAttention:  "\u0b95\u0bb5\u0ba9\u0bbf\u0baa\u0bcd\u0baa\u0bc1 \u0ba4\u0bc7\u0bb5\u0bc8",      // கவனிப்பு தேவை
+    stable:          "\u0ba8\u0bbf\u0bb2\u0bc8\u0baf\u0bbe\u0ba9",                                     // நிலையான
+    medLog:          "\u0bae\u0bb0\u0bc1\u0ba8\u0bcd\u0ba4\u0bc1 \u0baa\u0ba4\u0bbf\u0bb5\u0bc1 \u2014 \u0b87\u0ba9\u0bcd\u0bb0\u0bc1", // மருந்து பதிவு — இன்று
+    trendLegend:     "SpO2 \u00b7 \u0b95\u0bcb\u0b9f\u0bc1 = \u0baa\u0bbe\u0ba4\u0bc1\u0b95\u0bbe\u0baa\u0bcd\u0baa\u0bc1 \u0bb5\u0bb0\u0bae\u0bcd\u0baa\u0bc1", // SpO2 · கோடு = பாதுகாப்பு வரம்பு
+    demoControls:    "\u0b9f\u0bc6\u0bae\u0bcb \u0b95\u0b9f\u0bcd\u0b9f\u0bc1\u0baa\u0bcd\u0baa\u0bbe\u0b9f\u0bc1\u0b95\u0bb3\u0bcd",   // டெமோ கட்டுப்பாடுகள்
+    // Demo panel
+    simulate:        "சென்சார் தரவை உருவகப்படுத்து",  // will fix below
+    simNote:         "ESP32 வன்பொருள் இல்லாமல் டெமோ செய்ய. உண்மையான சென்சார் போல் தரவை பின்தளத்திற்கு அனுப்புகிறது.",
+    normal:          "\u0b9a\u0bbe\u0ba4\u0bbe\u0bb0\u0ba3",        // சாதாரண
+    fall:            "\u0bb5\u0bbf\u0bb4\u0bc1\u0b95\u0bc8",         // விழுகை
+    lowSpo2:         "\u0b95\u0bc1\u0bb1\u0bc8\u0ba8\u0bcd\u0ba4 SpO2", // குறைந்த SpO2
+    inactivity:      "\u0b9a\u0bc6\u0baf\u0bb2\u0bb1\u0bcd\u0bb1 \u0ba8\u0bbf\u0bb2\u0bc8", // செயலற்ற நிலை
+    // Medication log
+    medicineName:    "\u0bae\u0bb0\u0bc1\u0ba8\u0bcd\u0ba4\u0bbf\u0ba9\u0bcd \u0baa\u0bc6\u0baf\u0bb0\u0bcd",  // மருந்தின் பெயர்
+    schedule:        "\u0ba4\u0bbf\u0b9f\u0bcd\u0b9f\u0bae\u0bbf\u0b9f\u0bc1",              // திட்டமிடு
+    given:           "\u0bb5\u0bb4\u0b99\u0bcd\u0b95\u0baa\u0bcd\u0baa\u0b9f\u0bcd\u0b9f\u0ba4\u0bc1", // வழங்கப்பட்டது
+    givenLower:      "\u0bb5\u0bb4\u0b99\u0bcd\u0b95\u0baa\u0bcd\u0baa\u0b9f\u0bcd\u0b9f\u0ba4\u0bc1",
+    missed:          "\u0ba4\u0bb5\u0bb1\u0bbf\u0bb5\u0bbf\u0b9f\u0bcd\u0b9f\u0ba4\u0bc1",  // தவறிவிட்டது
+    due:             "\u0ba8\u0bbf\u0bb2\u0bc1\u0bb5\u0bc8\u0baf\u0bbf\u0bb2\u0bcd",         // நிலுவையில்
+    markGiven:       "\u0bb5\u0bb4\u0b99\u0bcd\u0b95\u0bbf\u0baf\u0ba4\u0bbe\u0b95 \u0b95\u0bc1\u0bb1\u0bbf", // வழங்கியதாக குறி
+    noDosesToday:    "\u0b87\u0ba9\u0bcd\u0bb1\u0bc1 \u0ba4\u0bbf\u0b9f\u0bcd\u0b9f\u0bae\u0bbf\u0b9f\u0bcd\u0b9f \u0bae\u0bb0\u0bc1\u0ba8\u0bcd\u0ba4\u0bc1\u0b95\u0bb3\u0bcd \u0b87\u0bb2\u0bcd\u0bb2\u0bc8.", // இன்று திட்டமிட்ட மருந்துகள் இல்லை.
+    // KPI strip
+    residents:       "\u0b95\u0bc1\u0b9f\u0bbf\u0baf\u0bbf\u0bb0\u0bc1\u0baa\u0bcd\u0baa\u0bbe\u0bb3\u0bb0\u0bcd\u0b95\u0bb3\u0bcd", // குடியிருப்பாளர்கள்
+    activeAlerts:    "\u0b9a\u0bc6\u0baf\u0bb2\u0bcd \u0b8e\u0b9a\u0bcd\u0b9a\u0bb0\u0bbf\u0b95\u0bcd\u0b95\u0bc8\u0b95\u0bb3\u0bcd", // செயல் எச்சரிக்கைகள்
+    lastSync:        "\u0b95\u0b9f\u0bc8\u0b9a\u0bbf \u0b92\u0ba4\u0bcd\u0ba4\u0bbf\u0b9a\u0bc8\u0bb5\u0bc1",  // கடைசி ஒத்திசைவு
+    // Vitals labels
+    hr:              "\u0b87.\u0ba4\u0bc1",   // இ.து  (abbrev. of இதய துடிப்பு)
+    spo2:            "SpO2",
+    temp:            "\u0bb5\u0bc6\u0baa\u0bcd\u0bcd",  // வெப்  (abbrev. of வெப்பநிலை)
+    // Connection pill
+    live:            "\u0ba8\u0bc7\u0bb0\u0b9f\u0bbf",   // நேரடி
+    reconnecting:    "\u0bae\u0bc0\u0ba3\u0bcd\u0b9f\u0bc1\u0bae\u0bcd \u0b87\u0ba3\u0bc8\u0b95\u0bcd\u0b95\u0bbf\u0bb1\u0ba4\u0bc1\u2026", // மீண்டும் இணைக்கிறது…
+    connecting:      "\u0b87\u0ba3\u0bc8\u0b95\u0bcd\u0b95\u0bbf\u0bb1\u0ba4\u0bc1\u2026",    // இணைக்கிறது…
+    // Dashboard states
+    allStable:       "\u0b85\u0ba9\u0bc8\u0ba4\u0bcd\u0ba4\u0bc1 \u0b95\u0bc1\u0b9f\u0bbf\u0baf\u0bbf\u0bb0\u0bc1\u0baa\u0bcd\u0baa\u0bbe\u0bb3\u0bb0\u0bcd\u0b95\u0bb3\u0bc1\u0bae\u0bcd \u0ba8\u0bbf\u0bb2\u0bc8\u0baf\u0bbe\u0b95 \u0bb5\u0bc1\u0bb3\u0bcd\u0bb3\u0ba9\u0bb0\u0bcd \u2014 \u0b8e\u0b9a\u0bcd\u0b9a\u0bb0\u0bbf\u0b95\u0bcd\u0b95\u0bc8\u0b95\u0bb3\u0bcd \u0b87\u0bb2\u0bcd\u0bb2\u0bc8.",
+    loading:         "\u0b8f\u0bb1\u0bcd\u0bb1\u0bc1\u0b95\u0bbf\u0bb1\u0ba4\u0bc1\u2026",    // ஏற்றுகிறது…
+    noResidents:     "\u0b95\u0bc1\u0b9f\u0bbf\u0baf\u0bbf\u0bb0\u0bc1\u0baa\u0bcd\u0baa\u0bbe\u0bb3\u0bb0\u0bcd\u0b95\u0bb3\u0bcd \u0baa\u0ba4\u0bbf\u0bb5\u0bc1 \u0b87\u0bb2\u0bcd\u0bb2\u0bc8. /api/residents-\u0b95\u0bcd\u0b95\u0bc1 POST \u0b85\u0ba9\u0bcd\u0baa\u0bc1\u0b95\u0bb5\u0bc1\u0bae\u0bcd.", // குடியிருப்பாளர்கள் பதிவு இல்லை.
+    noReadings:      "\u0b87\u0ba8\u0bcd\u0ba4 \u0b95\u0bc1\u0b9f\u0bbf\u0baf\u0bbf\u0bb0\u0bc1\u0baa\u0bcd\u0baa\u0bbe\u0bb3\u0bb0\u0bc1\u0b95\u0bcd\u0b95\u0bc1 \u0ba4\u0bb0\u0bb5\u0bc1 \u0b87\u0bb2\u0bcd\u0bb2\u0bc8.", // இந்த குடியிருப்பாளருக்கு தரவு இல்லை.
+    failedTrend:     "\u0baa\u0bcb\u0b95\u0bcd\u0b95\u0bc1 \u0ba4\u0bb0\u0bb5\u0bc8 \u0b8f\u0bb1\u0bcd\u0bb1 \u0bae\u0bc1\u0b9f\u0bbf\u0baf\u0bb5\u0bbf\u0bb2\u0bcd\u0bb2\u0bc8.", // போக்கு தரவை ஏற்ற முடியவில்லை.
+    noResidentsYet:  "\u0b95\u0bc1\u0b9f\u0bbf\u0baf\u0bbf\u0bb0\u0bc1\u0baa\u0bcd\u0baa\u0bbe\u0bb3\u0bb0\u0bcd\u0b95\u0bb3\u0bcd \u0b87\u0bb2\u0bcd\u0bb2\u0bc8.",  // குடியிருப்பாளர்கள் இல்லை.
+    noData:          "\u0ba4\u0bb0\u0bb5\u0bc1 \u0b87\u0bb2\u0bcd\u0bb2\u0bc8",   // தரவு இல்லை
+    // Acknowledge
+    acknowledgeAll:  "\u0b85\u0ba9\u0bc8\u0ba4\u0bcd\u0ba4\u0bc1\u0bae\u0bcd \u0b92\u0baa\u0bcd\u0baa\u0bc1\u0b95\u0bca\u0bb3\u0bcd",  // அனைத்தும் ஒப்புகொள்
+    staffNamePrompt: "\u0b89\u0b99\u0bcd\u0b95\u0bb3\u0bcd \u0baa\u0bc6\u0baf\u0bb0\u0bcd (\u0baa\u0ba4\u0bbf\u0bb5\u0bbf\u0bb1\u0bcd\u0b95\u0bbe\u0b95):", // உங்கள் பெயர் (பதிவிற்காக):
+    staff:           "\u0b8a\u0bb4\u0bbf\u0baf\u0bb0\u0bcd",           // ஊழியர்
+    // Push
+    enableAlerts:    "\u0b8e\u0b9a\u0bcd\u0b9a\u0bb0\u0bbf\u0b95\u0bcd\u0b95\u0bc8\u0b95\u0bb3\u0bc8 \u0b87\u0baf\u0b95\u0bcd\u0b95\u0bc1", // எச்சரிக்கைகளை இயக்கு
+    alertsEnabled:   "\u0b8e\u0b9a\u0bcd\u0b9a\u0bb0\u0bbf\u0b95\u0bcd\u0b95\u0bc8\u0b95\u0bb3\u0bcd \u0b87\u0baf\u0b95\u0bcd\u0b95\u0baa\u0bcd\u0baa\u0b9f\u0bcd\u0b9f\u0ba9 \u2713", // எச்சரிக்கைகள் இயக்கப்பட்டன ✓
+    notifBlocked:    "\u0b85\u0bb1\u0bbf\u0bb5\u0bbf\u0baa\u0bcd\u0baa\u0bc1\u0b95\u0bb3\u0bcd \u0ba4\u0b9f\u0bc1\u0b95\u0bcd\u0b95\u0baa\u0bcd\u0baa\u0b9f\u0bcd\u0b9f\u0ba9", // அறிவிப்புகள் தடுக்கப்பட்டன
+    // Demo sim
+    noResidentSim:   "\u0b95\u0bc1\u0b9f\u0bbf\u0baf\u0bbf\u0bb0\u0bc1\u0baa\u0bcd\u0baa\u0bbe\u0bb3\u0bb0\u0bcd \u0ba4\u0bc7\u0bb0\u0bcd\u0ba8\u0bcd\u0ba4\u0bc6\u0b9f\u0bc1\u0b95\u0bcd\u0b95\u0baa\u0bcd\u0baa\u0b9f\u0bb5\u0bbf\u0bb2\u0bcd\u0bb2\u0bc8.", // குடியிருப்பாளர் தேர்ந்தெடுக்கப்படவில்லை.
+    // Medication form
+    medFormError:    "\u0b95\u0bc1\u0b9f\u0bbf\u0baf\u0bbf\u0bb0\u0bc1\u0baa\u0bcd\u0baa\u0bbe\u0bb3\u0bb0\u0bc8 \u0ba4\u0bc7\u0bb0\u0bcd\u0ba8\u0bcd\u0ba4\u0bc6\u0b9f\u0bc1\u0ba4\u0bcd\u0ba4\u0bc1, \u0bae\u0bb0\u0bc1\u0ba8\u0bcd\u0ba4\u0bbf\u0ba9\u0bcd \u0baa\u0bc6\u0baf\u0bb0\u0bcd \u0bae\u0bb1\u0bcd\u0bb1\u0bc1\u0bae\u0bcd \u0ba8\u0bc7\u0bb0\u0ba4\u0bcd\u0ba4\u0bc8 \u0b89\u0bb3\u0bcd\u0bb3\u0bbf\u0b9f\u0bb5\u0bc1\u0bae\u0bcd.", // குடியிருப்பாளரை தேர்ந்தெடுத்து, மருந்தின் பெயர் மற்றும் நேரத்தை உள்ளிடவும்.
+  }
+};
+
+
+let currentLang = localStorage.getItem("smartcare-lang") || "en";
+function t(key) { return STRINGS[currentLang]?.[key] ?? STRINGS.en[key] ?? key; }
+
+// wsState tracks the current connection status so the lang toggle can
+// re-translate the conn pill correctly even mid-session.
+let wsState = "connecting";   // "connecting" | "live" | "reconnecting"
+
+function applyLangToStatic() {
+  // Document language (helps screen readers)
+  document.documentElement.lang = currentLang === "ta" ? "ta" : "en";
+
+  // Static text nodes with IDs
+  document.getElementById("labelNeedsAttention").textContent = t("needsAttention");
+  document.getElementById("labelStable").textContent         = t("stable");
+  document.getElementById("labelMedLog").textContent         = t("medLog");
+  document.getElementById("labelTrendLegend").textContent    = t("trendLegend");
+  document.getElementById("labelDemoControls").textContent   = t("demoControls");
+  document.getElementById("labelSimulate").textContent       = t("simulate");
+  document.getElementById("labelSimNote").textContent        = t("simNote");
+  document.getElementById("btnSimNormal").textContent        = t("normal");
+  document.getElementById("btnSimFall").textContent          = t("fall");
+  document.getElementById("btnSimLowSpo2").textContent       = t("lowSpo2");
+  document.getElementById("btnSimInactivity").textContent    = t("inactivity");
+  document.getElementById("medAddBtn").textContent           = t("schedule");
+  document.getElementById("medName").placeholder             = t("medicineName");
+
+  // Lang toggle button itself
+  document.getElementById("langLabel").textContent = currentLang === "en" ? "\u0BA4" : "EN";
+  document.getElementById("langToggle").title =
+    currentLang === "en" ? "Switch to Tamil / \u0BA4\u0BAE\u0BBF\u0BB4\u0BBF\u0BB2\u0BCD \u0BAE\u0BBE\u0BB1\u0BC1" : "Switch to English";
+
+  // Conn pill — translate without clobbering "connecting…" on first load
+  const connText = document.getElementById("connText");
+  if (wsState === "live")         connText.textContent = t("live");
+  else if (wsState === "reconnecting") connText.textContent = t("reconnecting");
+  else                            connText.textContent = t("connecting");
+
+  // Push button — re-translate keeping its current enabled/disabled state
+  const pl = document.getElementById("pushToggleLabel");
+  const enEnabled = STRINGS.en.alertsEnabled, taEnabled = STRINGS.ta.alertsEnabled;
+  if (pl.textContent === enEnabled || pl.textContent === taEnabled) {
+    pl.textContent = t("alertsEnabled");
+  } else {
+    pl.textContent = t("enableAlerts");
+  }
+}
+
+document.getElementById("langToggle").addEventListener("click", () => {
+  currentLang = currentLang === "en" ? "ta" : "en";
+  localStorage.setItem("smartcare-lang", currentLang);
+  applyLangToStatic();
+  // Re-render all dynamic sections
+  renderDashboard();
+  renderMedicationLog();
+  renderTrendChart();
+});
+
 const BACKEND_HOST = "smartcare-backend-pcc5.onrender.com";
 
 const isLocal = BACKEND_HOST.startsWith("localhost") || BACKEND_HOST.startsWith("127.0.0.1");
@@ -633,6 +836,7 @@ document.getElementById("themeToggle").addEventListener("click", () => {
   applyThemeIcon();
 });
 initTheme();
+applyLangToStatic();
 
 const demoToggle = document.getElementById("demoToggle");
 const demoDrawer = document.getElementById("demoDrawer");
@@ -706,9 +910,9 @@ async function buildSparkline(residentId, color) {
 function vitalsRowHtml(lr) {
   return `
     <div class="vitals-row">
-      <div class="stat"><div class="label">HR</div><div class="val">${lr.heart_rate ?? '--'}</div></div>
-      <div class="stat"><div class="label">SpO2</div><div class="val">${lr.spo2 ?? '--'}%</div></div>
-      <div class="stat"><div class="label">Temp</div><div class="val">${lr.temperature ?? '--'}°</div></div>
+      <div class="stat"><div class="label">${t('hr')}</div><div class="val">${lr.heart_rate ?? '--'}</div></div>
+      <div class="stat"><div class="label">${t('spo2')}</div><div class="val">${lr.spo2 ?? '--'}%</div></div>
+      <div class="stat"><div class="label">${t('temp')}</div><div class="val">${lr.temperature ?? '--'}°</div></div>
     </div>`;
 }
 
@@ -726,10 +930,10 @@ async function renderDashboard() {
 function renderKpiRow(total, alertCount, stableCount) {
   const syncLabel = lastSyncAt ? `${Math.max(0, Math.round((Date.now() - lastSyncAt) / 1000))}s` : '--';
   document.getElementById("kpiRow").innerHTML = `
-    <div class="kpi-card"><div class="kpi-label">Residents</div><div class="kpi-value">${total}</div></div>
-    <div class="kpi-card ${alertCount > 0 ? 'danger' : ''}"><div class="kpi-label">Active alerts</div><div class="kpi-value">${alertCount}</div></div>
-    <div class="kpi-card ok"><div class="kpi-label">Stable</div><div class="kpi-value">${stableCount}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Last sync</div><div class="kpi-value" id="lastSyncVal">${syncLabel}</div></div>
+    <div class="kpi-card"><div class="kpi-label">${t('residents')}</div><div class="kpi-value">${total}</div></div>
+    <div class="kpi-card ${alertCount > 0 ? 'danger' : ''}"><div class="kpi-label">${t('activeAlerts')}</div><div class="kpi-value">${alertCount}</div></div>
+    <div class="kpi-card ok"><div class="kpi-label">${t('stable')}</div><div class="kpi-value">${stableCount}</div></div>
+    <div class="kpi-card"><div class="kpi-label">${t('lastSync')}</div><div class="kpi-value" id="lastSyncVal">${syncLabel}</div></div>
   `;
   document.getElementById("attentionCount").textContent = alertCount;
   document.getElementById("stableCount").textContent = stableCount;
@@ -743,7 +947,7 @@ setInterval(() => {
 async function renderAttentionFeed(attentionResidents) {
   const feed = document.getElementById("attentionFeed");
   if (!attentionResidents.length) {
-    feed.innerHTML = '<div class="empty-calm">All residents stable — no active alerts.</div>';
+    feed.innerHTML = `<div class="empty-calm">${t('allStable')}</div>`;
     return;
   }
 
@@ -778,12 +982,12 @@ async function renderAttentionFeed(attentionResidents) {
       <div class="incident-card ${r.status}">
         <div class="incident-head">
           <h3>${r.name} <span class="room">${r.room_no || '—'}</span></h3>
-          <button class="ack-all-btn" onclick="acknowledgeAllForResident(${r.id})">Acknowledge all (${residentAlerts.length})</button>
+          <button class="ack-all-btn" onclick="acknowledgeAllForResident(${r.id})">${t('acknowledgeAll')} (${residentAlerts.length})</button>
         </div>
         <div class="incident-alerts">${groupRows}</div>
         ${spark}
         ${vitalsRowHtml(lr)}
-        <div class="updated-at">${lr.timestamp ? new Date(lr.timestamp).toLocaleTimeString() : 'no data'}</div>
+        <div class="updated-at">${lr.timestamp ? new Date(lr.timestamp).toLocaleTimeString() : t('noData')}</div>
       </div>`;
   }));
   feed.innerHTML = cards.join("");
@@ -792,7 +996,7 @@ async function renderAttentionFeed(attentionResidents) {
 function renderStableGrid(stableResidents) {
   const grid = document.getElementById("stableGrid");
   if (!residentsCache.length) {
-    grid.innerHTML = '<div class="empty-note">No residents registered yet. POST to /api/residents to add one.</div>';
+    grid.innerHTML = `<div class="empty-note">${t('noResidents')}</div>`;
     return;
   }
   if (!stableResidents.length) {
@@ -807,13 +1011,13 @@ function renderStableGrid(stableResidents) {
           <h4>${r.name}</h4>
           <span class="room">${r.room_no || '—'}</span>
         </div>
-        <div class="hr-val">HR <b>${lr.heart_rate ?? '--'}</b></div>
+        <div class="hr-val">${t('hr')} <b>${lr.heart_rate ?? '--'}</b></div>
       </div>`;
   }).join("");
 }
 
 async function acknowledgeAllForResident(residentId) {
-  const staffName = prompt("Your name (for the log):", "Staff");
+  const staffName = prompt(t('staffNamePrompt'), t('staff'));
   if (!staffName) return;
   try {
     await fetch(`${API_BASE}/api/residents/${residentId}/acknowledge-all`, {
@@ -833,9 +1037,9 @@ function connectWebSocket() {
   const dot = document.getElementById("connDot");
   const text = document.getElementById("connText");
 
-  ws.onopen = () => { dot.classList.add("live"); text.textContent = "live"; };
+  ws.onopen = () => { wsState = "live"; dot.classList.add("live"); text.textContent = t("live"); };
   ws.onclose = () => {
-    dot.classList.remove("live"); text.textContent = "reconnecting…";
+    wsState = "reconnecting"; dot.classList.remove("live"); text.textContent = t("reconnecting");
     setTimeout(connectWebSocket, 3000);
   };
   ws.onmessage = (event) => {
@@ -920,7 +1124,7 @@ function buildTrendSvg(readings, threshold, lineColor) {
 async function renderTrendChart() {
   const wrap = document.getElementById("trendChartWrap");
   const residentId = trendSelect.value;
-  if (!residentId) { wrap.innerHTML = '<div class="trend-empty">No residents yet.</div>'; return; }
+  if (!residentId) { wrap.innerHTML = `<div class="trend-empty">${t('noResidentsYet')}</div>`; return; }
 
   const resident = residentsCache.find(r => String(r.id) === String(residentId));
   const threshold = resident?.spo2_min ?? 92;
@@ -929,9 +1133,9 @@ async function renderTrendChart() {
   try {
     const hist = await fetch(`${API_BASE}/api/residents/${residentId}/history?limit=30`).then(x => x.json());
     const chart = buildTrendSvg(hist, threshold, lineColor);
-    wrap.innerHTML = chart || '<div class="trend-empty">No readings yet for this resident.</div>';
+    wrap.innerHTML = chart || `<div class="trend-empty">${t('noReadings')}</div>`;
   } catch (e) {
-    wrap.innerHTML = '<div class="trend-empty">Failed to load trend data.</div>';
+    wrap.innerHTML = `<div class="trend-empty">${t('failedTrend')}</div>`;
   }
 }
 
@@ -962,7 +1166,7 @@ function renderMedicationLog() {
   document.getElementById("medCount").textContent = medsCache.length;
 
   if (!medsCache.length) {
-    list.innerHTML = '<div class="trend-empty">No doses scheduled today.</div>';
+    list.innerHTML = `<div class="trend-empty">${t('noDosesToday')}</div>`;
     return;
   }
 
@@ -970,12 +1174,12 @@ function renderMedicationLog() {
     <div class="med-row">
       <div class="med-info">
         <div class="name">${m.resident_name} — ${m.medicine_name}</div>
-        <div class="meta">${new Date(m.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${m.given_at ? ` · given ${new Date(m.given_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</div>
+        <div class="meta">${new Date(m.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${m.given_at ? ` · ${t('givenLower')} ${new Date(m.given_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</div>
       </div>
       ${m.status === "given"
-        ? '<span class="med-status-pill given">Given</span>'
-        : `<span class="med-status-pill ${m.status}">${m.status === "missed" ? "Missed" : "Due"}</span>
-           <button class="med-give-btn" onclick="markMedicationGiven(${m.id})">Mark given</button>`
+        ? `<span class="med-status-pill given">${t('given')}</span>`
+        : `<span class="med-status-pill ${m.status}">${m.status === "missed" ? t('missed') : t('due')}</span>
+           <button class="med-give-btn" onclick="markMedicationGiven(${m.id})">${t('markGiven')}</button>`
       }
     </div>`).join("");
 }
@@ -985,7 +1189,7 @@ async function scheduleMedication() {
   const medName = document.getElementById("medName").value.trim();
   const timeVal = document.getElementById("medTime").value; // "HH:MM"
   if (!residentId || !medName || !timeVal) {
-    alert("Pick a resident, enter a medicine name, and set a time.");
+    alert(t('medFormError'));
     return;
   }
   const [hh, mm] = timeVal.split(":").map(Number);
@@ -1043,7 +1247,7 @@ const SCENARIOS = {
 async function runScenario(name) {
   const residentId = document.getElementById("demoResident").value;
   const statusEl = document.getElementById("demoStatus");
-  if (!residentId) { statusEl.textContent = "No resident selected — register one first."; return; }
+  if (!residentId) { statusEl.textContent = t('noResidentSim'); return; }
 
   document.querySelectorAll(".sim-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.scenario === name);
@@ -1100,14 +1304,14 @@ async function refreshPushButtonState() {
     return;
   }
   const existing = await getExistingPushSubscription();
-  pushLabel.textContent = existing ? "Alerts enabled ✓" : "Enable alerts on this phone";
+  pushLabel.textContent = existing ? t('alertsEnabled') : t('enableAlerts');
 }
 
 async function enablePushNotifications() {
   try {
     const permission = await Notification.requestPermission();
     if (permission !== "granted") {
-      pushLabel.textContent = "Notifications blocked";
+      pushLabel.textContent = t('notifBlocked');
       return;
     }
     const reg = await navigator.serviceWorker.register("sw.js");
@@ -1124,10 +1328,10 @@ async function enablePushNotifications() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(sub.toJSON()),
     });
-    pushLabel.textContent = "Alerts enabled ✓";
+    pushLabel.textContent = t('alertsEnabled');
   } catch (e) {
     console.error("Push subscription failed", e);
-    pushLabel.textContent = "Enable alerts on this phone";
+    pushLabel.textContent = t('enableAlerts');
   }
 }
 
@@ -1136,7 +1340,7 @@ pushBtn.addEventListener("click", async () => {
   if (existing) {
     // already enabled - tapping again just confirms status, doesn't unsubscribe,
     // to avoid a staff member accidentally turning off alerts with one tap
-    pushLabel.textContent = "Alerts enabled ✓";
+    pushLabel.textContent = t('alertsEnabled');
     return;
   }
   enablePushNotifications();
